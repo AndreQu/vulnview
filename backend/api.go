@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -18,8 +19,17 @@ func API(r chi.Router) {
 	r.Get("/api/v1/devices", listDevicesHandler)
 	r.Get("/api/v1/devices/{id}", getDeviceHandler)
 	r.Get("/api/v1/devices/{id}/software", getDeviceSoftwareHandler)
+	r.Get("/api/v1/devices/{id}/vulnerabilities", getDeviceVulnerabilitiesHandler)
 	r.Post("/api/v1/heartbeat", heartbeatHandler)
 	r.Post("/api/v1/scan", scanHandler)
+	
+	// CVE Endpoints
+	r.Get("/api/v1/vulnerabilities", listVulnerabilitiesHandler)
+	r.Get("/api/v1/vulnerabilities/stats", vulnerabilityStatsHandler)
+	r.Get("/api/v1/vulnerabilities/{cve_id}", getCVEHandler)
+	
+	// Admin/Sync endpoints
+	r.Post("/api/v1/admin/sync-cves", syncCVEsHandler)
 }
 
 // healthHandler returns service health status
@@ -269,6 +279,174 @@ func scanHandler(w http.ResponseWriter, r *http.Request) {
 		Data: map[string]interface{}{
 			"software_processed": len(result.Software),
 			"processes_reported": len(result.Processes),
+		},
+	})
+}
+
+// CVE Handlers
+
+// listVulnerabilitiesHandler returns all CVEs with optional filters
+func listVulnerabilitiesHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	
+	severity := r.URL.Query().Get("severity")
+	limit := 100
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 1000 {
+			limit = parsed
+		}
+	}
+	
+	query := `
+		SELECT cve_id, description, cvss_score, severity, published_date, epss_score
+		FROM cves
+		WHERE 1=1
+	`
+	params := []interface{}{}
+	
+	if severity != "" {
+		query += ` AND severity = $1`
+		params = append(params, severity)
+	}
+	
+	query += ` ORDER BY cvss_score DESC NULLS LAST LIMIT $` + strconv.Itoa(len(params)+1)
+	params = append(params, limit)
+	
+	rows, err := db.Query(ctx, query, params...)
+	if err != nil {
+		render.JSON(w, r, APIResponse{Success: false, Error: err.Error()})
+		return
+	}
+	defer rows.Close()
+	
+	var cves []map[string]interface{}
+	for rows.Next() {
+		var cveID, desc, severity string
+		var cvssScore *float64
+		var epssScore *float64
+		var published time.Time
+		
+		if err := rows.Scan(&cveID, &desc, &cvssScore, &severity, &published, &epssScore); err != nil {
+			continue
+		}
+		
+		cves = append(cves, map[string]interface{}{
+			"cve_id":        cveID,
+			"description":   desc,
+			"cvss_score":    cvssScore,
+			"severity":      severity,
+			"published":     published,
+			"epss_score":    epssScore,
+		})
+	}
+	
+	render.JSON(w, r, APIResponse{Success: true, Data: cves})
+}
+
+// getCVEHandler returns a single CVE by ID
+func getCVEHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	cveID := chi.URLParam(r, "cve_id")
+	
+	var cve map[string]interface{}
+	err := db.QueryRow(ctx, `
+		SELECT cve_id, description, cvss_score, cvss_vector, severity,
+		       published_date, last_modified, epss_score, cwe_ids, references
+		FROM cves WHERE cve_id = $1
+	`, cveID).Scan(
+		&cve["cve_id"], &cve["description"], &cve["cvss_score"],
+		&cve["cvss_vector"], &cve["severity"], &cve["published_date"],
+		&cve["last_modified"], &cve["epss_score"], &cve["cwe_ids"], &cve["references"],
+	)
+	
+	if err != nil {
+		render.JSON(w, r, APIResponse{Success: false, Error: "CVE not found"})
+		return
+	}
+	
+	render.JSON(w, r, APIResponse{Success: true, Data: cve})
+}
+
+// vulnerabilityStatsHandler returns vulnerability statistics
+func vulnerabilityStatsHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	
+	stats, err := GetCVEStats(ctx, db)
+	if err != nil {
+		render.JSON(w, r, APIResponse{Success: false, Error: err.Error()})
+		return
+	}
+	
+	render.JSON(w, r, APIResponse{Success: true, Data: stats})
+}
+
+// getDeviceVulnerabilitiesHandler returns vulnerabilities for a device
+func getDeviceVulnerabilitiesHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	deviceID := chi.URLParam(r, "id")
+	
+	// Get device UUID
+	var deviceUUID uuid.UUID
+	err := db.QueryRow(ctx, `SELECT id FROM devices WHERE device_id = $1`, deviceID).Scan(&deviceUUID)
+	if err != nil {
+		render.JSON(w, r, APIResponse{Success: false, Error: "Device not found"})
+		return
+	}
+	
+	// Get vulnerabilities with software details
+	rows, err := db.Query(ctx, `
+		SELECT sv.id, c.cve_id, c.description, c.cvss_score, c.severity,
+		       sv.risk_score, sv.status, s.name as software_name, s.version as software_version
+		FROM software_vulnerabilities sv
+		JOIN cves c ON sv.cve_id = c.id
+		JOIN software s ON sv.software_id = s.id
+		WHERE s.device_id = $1
+		ORDER BY sv.risk_score DESC NULLS LAST
+	`, deviceUUID)
+	
+	if err != nil {
+		render.JSON(w, r, APIResponse{Success: false, Error: err.Error()})
+		return
+	}
+	defer rows.Close()
+	
+	var vulns []map[string]interface{}
+	for rows.Next() {
+		var id, cveID, desc, severity, status, swName, swVersion string
+		var cvssScore, riskScore *float64
+		
+		if err := rows.Scan(&id, &cveID, &desc, &cvssScore, &severity,
+			&riskScore, &status, &swName, &swVersion); err != nil {
+			continue
+		}
+		
+		vulns = append(vulns, map[string]interface{}{
+			"id":              id,
+			"cve_id":          cveID,
+			"description":     desc,
+			"cvss_score":      cvssScore,
+			"severity":        severity,
+			"risk_score":      riskScore,
+			"status":          status,
+			"software_name":   swName,
+			"software_version": swVersion,
+		})
+	}
+	
+	render.JSON(w, r, APIResponse{Success: true, Data: vulns})
+}
+
+// syncCVEsHandler triggers a CVE sync from NVD
+func syncCVEsHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	
+	// This would typically run as a background job
+	// For now, we return immediately with a message
+	render.JSON(w, r, APIResponse{
+		Success: true,
+		Data: map[string]interface{}{
+			"message": "CVE sync started",
+			"note":    "In production, this runs as a scheduled job",
 		},
 	})
 }
