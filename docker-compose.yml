@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: vulnview-db
+    environment:
+      POSTGRES_USER: vulnview
+      POSTGRES_PASSWORD: vulnview_secret_2026
+      POSTGRES_DB: vulnview
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vulnview"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vulnview-backend
+    ports:
+      - "8443:8443"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: vulnview
+      DB_PASSWORD: vulnview_secret_2026
+      DB_NAME: vulnview
+      SERVER_CERT: /certs/server.crt
+      SERVER_KEY: /certs/server.key
+      CA_CERT: /certs/ca.crt
+    volumes:
+      - ./certs:/certs:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
