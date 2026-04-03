@@ -20,7 +20,8 @@ const (
 	RATE_LIMIT_DELAY = 6 * time.Second // NVD rate limit: 5 requests per 30 seconds without key
 )
 
-// NVDClient handles communication with NVD APItype NVDClient struct {
+// NVDClient handles communication with NVD API
+type NVDClient struct {
 	httpClient *http.Client
 	apiKey     string
 	baseURL    string
