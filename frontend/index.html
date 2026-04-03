@@ -3,114 +3,178 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VulnView Dashboard</title>
-    <link rel="stylesheet" href="style.css">
+    <title>VulnView</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="app">
-        <header class="header">
-            <div class="header-brand">
+    <div id="app" class="app">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
                 <div class="logo">
-                    <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                        <rect width="32" height="32" rx="8" fill="#6366f1"/>
-                        <path d="M16 8L24 24H8L16 8Z" fill="white"/>
+                    <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                        <rect width="28" height="28" rx="7" fill="var(--accent)"/>
+                        <path d="M14 7L21 21H7L14 7Z" fill="white"/>
                     </svg>
                 </div>
-                <h1>VulnView</h1>
+                <span class="brand-text">VulnView</span>
             </div>
-            <div class="header-actions">
-                <span class="api-status" id="apiStatus">● Verbindung wird hergestellt...</span>
-                <button class="btn btn-refresh" id="refreshBtn">🔄 Aktualisieren</button>
+            
+            <nav class="sidebar-nav">
+                <a href="#dashboard" class="nav-item active" data-page="dashboard">
+                    <span class="nav-icon">◦</span>
+                    <span class="nav-label">Dashboard</span>
+                </a>
+                <a href="#devices" class="nav-item" data-page="devices">
+                    <span class="nav-icon">◦</span>
+                    <span class="nav-label">Geräte</span>
+                </a>
+                <a href="#software" class="nav-item" data-page="software">
+                    <span class="nav-icon">◦</span>
+                    <span class="nav-label">Software</span>
+                </a>
+                <a href="#vulnerabilities" class="nav-item" data-page="vulnerabilities">
+                    <span class="nav-icon">◦</span>
+                    <span class="nav-label">Schwachstellen</span>
+                </a>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <button class="theme-toggle" id="themeToggle">
+                    <span class="theme-icon">◐</span>
+                    <span class="theme-label">Erscheinungsbild</span>
+                </button>
             </div>
-        </header>
+        </aside>
 
+        <!-- Main Content -->
         <main class="main">
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-icon">🖥️</div>
-                    <div class="stat-content">
-                        <div class="stat-value" id="totalDevices">-</div>
-                        <div class="stat-label">Geräte</div>
-                    </div>
+            <!-- Header -->
+            <header class="header">
+                <div class="header-content">
+                    <h1 class="page-title">Dashboard</h1>
+                    <p class="page-subtitle">Übersicht Ihrer Endpoints</p>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-icon online">●</div>
-                    <div class="stat-content">
-                        <div class="stat-value" id="onlineDevices">-</div>
-                        <div class="stat-label">Online</div>
+                <div class="header-actions">
+                    <div class="status-pill" id="apiStatus">
+                        <span class="status-dot"></span>
+                        <span class="status-text">Verbindung wird hergestellt</span>
                     </div>
+                    <button class="btn btn-primary" id="refreshBtn">
+                        <span class="btn-icon">↻</span>
+                        Aktualisieren
+                    </button>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-icon offline">●</div>
-                    <div class="stat-content">
-                        <div class="stat-value" id="offlineDevices">-</div>
-                        <div class="stat-label">Offline</div>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">📦</div>
-                    <div class="stat-content">
-                        <div class="stat-value" id="totalSoftware">-</div>
-                        <div class="stat-label">Software</div>
-                    </div>
-                </div>
-            </div>
+            </header>
 
-            <div class="content-grid">
-                <section class="panel">
-                    <div class="panel-header">
-                        <h2>Geräte</h2>
-                        <div class="panel-actions">
-                            <input type="text" class="search-input" id="deviceSearch" placeholder="Gerät suchen...">
+            <!-- Content -->
+            <div class="content">
+                <!-- Stats Grid -->
+                <div class="stats-grid">
+                    <div class="stat-card glass">
+                        <div class="stat-header">
+                            <span class="stat-label">Geräte</span>
+                            <span class="stat-icon">🖥</span>
+                        </div>
+                        <div class="stat-value" id="totalDevices">—</div>
+                        <div class="stat-change positive">+2 diese Woche</div>
+                    </div>
+                    
+                    <div class="stat-card glass">
+                        <div class="stat-header">
+                            <span class="stat-label">Online</span>
+                            <span class="stat-icon online">●</span>
+                        </div>
+                        <div class="stat-value" id="onlineDevices">—</div>
+                        <div class="stat-change" id="onlinePercent">—% aktiv</div>
+                    </div>
+                    
+                    <div class="stat-card glass">
+                        <div class="stat-header">
+                            <span class="stat-label">Software</span>
+                            <span class="stat-icon">◫</span>
+                        </div>
+                        <div class="stat-value" id="totalSoftware">—</div>
+                        <div class="stat-change">Inventarisiert</div>
+                    </div>
+                    
+                    <div class="stat-card glass accent">
+                        <div class="stat-header">
+                            <span class="stat-label">Risiko-Score</span>
+                            <span class="stat-icon">◈</span>
+                        </div>
+                        <div class="stat-value" id="riskScore">—</div>
+                        <div class="stat-change">Durchschnitt</div>
+                    </div>
+                </div>
+
+                <!-- Devices Section -->
+                <section class="section">
+                    <div class="section-header">
+                        <h2 class="section-title">Geräte</h2>
+                        <div class="section-actions">
+                            <div class="search-field">
+                                <input type="text" class="search-input" id="deviceSearch" placeholder="Gerät suchen...">
+                                <span class="search-icon">⌕</span>
+                            </div>
                         </div>
                     </div>
-                    <div class="panel-body">
+                    
+                    <div class="table-container glass">
                         <table class="data-table" id="devicesTable">
                             <thead>
                                 <tr>
-                                    <th>Status</th>
-                                    <th>Hostname</th>
-                                    <th>Betriebssystem</th>
-                                    <th>Version</th>
+                                    <th>Gerät</th>
+                                    <th>System</th>
                                     <th>Agent</th>
-                                    <th>Letzter Kontakt</th>
+                                    <th>Status</th>
+                                    <th>Zuletzt aktiv</th>
                                 </tr>
                             </thead>
                             <tbody id="devicesTableBody">
                                 <tr>
-                                    <td colspan="6" class="loading">Lade Geräte...</td>
+                                    <td colspan="5" class="loading-state">
+                                        <div class="loading-spinner"></div>
+                                        <p>Geräte werden geladen...</p>
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                 </section>
             </div>
+        </main>
 
-            <!-- Device Detail Modal -->
-            <div class="modal" id="deviceModal">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h2 id="modalDeviceName">Gerät Details</h2>
-                        <button class="btn-close" id="closeModal">×</button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="device-info" id="deviceInfo">
-                            <!-- Device info will be inserted here -->
+        <!-- Detail Panel (Slide-in) -->
+        <aside class="detail-panel" id="detailPanel">
+            <div class="detail-panel-inner">
+                <div class="detail-header">
+                    <button class="btn-close" id="closeDetail">✕</button>
+                    <div class="device-avatar" id="detailAvatar">🖥</div>
+                    <h2 class="detail-title" id="detailTitle">Gerät</h2>
+                    <p class="detail-subtitle" id="detailSubtitle">Details</p>
+                </div>
+                
+                <div class="detail-content">
+                    <div class="detail-section">
+                        <h3>Systeminformationen</h3>
+                        <div class="info-grid" id="deviceInfo">
+                            <!-- Dynamic content -->
                         </div>
+                    </div>
+                    
+                    <div class="detail-section">
                         <h3>Software-Inventar</h3>
                         <div class="software-list" id="softwareList">
-                            <div class="loading">Lade Software...</div>
+                            <!-- Dynamic content -->
                         </div>
                     </div>
                 </div>
             </div>
-        </main>
-
-        <footer class="footer">
-            <p>VulnView MVP • <span id="lastUpdate">Nie</span> • Auto-Refresh: 30s</p>
-        </footer>
+        </aside>
     </div>
 
     <script src="app.js"></script>
