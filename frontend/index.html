@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VulnView Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app">
+        <header class="header">
+            <div class="header-brand">
+                <div class="logo">
+                    <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                        <rect width="32" height="32" rx="8" fill="#6366f1"/>
+                        <path d="M16 8L24 24H8L16 8Z" fill="white"/>
+                    </svg>
+                </div>
+                <h1>VulnView</h1>
+            </div>
+            <div class="header-actions">
+                <span class="api-status" id="apiStatus">● Verbindung wird hergestellt...</span>
+                <button class="btn btn-refresh" id="refreshBtn">🔄 Aktualisieren</button>
+            </div>
+        </header>
+
+        <main class="main">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">🖥️</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="totalDevices">-</div>
+                        <div class="stat-label">Geräte</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon online">●</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="onlineDevices">-</div>
+                        <div class="stat-label">Online</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon offline">●</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="offlineDevices">-</div>
+                        <div class="stat-label">Offline</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📦</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="totalSoftware">-</div>
+                        <div class="stat-label">Software</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="content-grid">
+                <section class="panel">
+                    <div class="panel-header">
+                        <h2>Geräte</h2>
+                        <div class="panel-actions">
+                            <input type="text" class="search-input" id="deviceSearch" placeholder="Gerät suchen...">
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <table class="data-table" id="devicesTable">
+                            <thead>
+                                <tr>
+                                    <th>Status</th>
+                                    <th>Hostname</th>
+                                    <th>Betriebssystem</th>
+                                    <th>Version</th>
+                                    <th>Agent</th>
+                                    <th>Letzter Kontakt</th>
+                                </tr>
+                            </thead>
+                            <tbody id="devicesTableBody">
+                                <tr>
+                                    <td colspan="6" class="loading">Lade Geräte...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Device Detail Modal -->
+            <div class="modal" id="deviceModal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 id="modalDeviceName">Gerät Details</h2>
+                        <button class="btn-close" id="closeModal">×</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="device-info" id="deviceInfo">
+                            <!-- Device info will be inserted here -->
+                        </div>
+                        <h3>Software-Inventar</h3>
+                        <div class="software-list" id="softwareList">
+                            <div class="loading">Lade Software...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <p>VulnView MVP • <span id="lastUpdate">Nie</span> • Auto-Refresh: 30s</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
