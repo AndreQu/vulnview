@@ -23,6 +23,9 @@ func API(r chi.Router) {
 	r.Post("/api/v1/heartbeat", heartbeatHandler)
 	r.Post("/api/v1/scan", scanHandler)
 	
+	// SBOM Endpoint
+	r.Get("/api/v1/devices/{id}/sbom", sbomHandler)
+	
 	// CVE Endpoints
 	r.Get("/api/v1/vulnerabilities", listVulnerabilitiesHandler)
 	r.Get("/api/v1/vulnerabilities/stats", vulnerabilityStatsHandler)

@@ -93,6 +93,13 @@ function setupEventListeners() {
 
   // Close detail
   elements.closeDetail.addEventListener('click', closeDetailPanel);
+  
+  // SBOM Download
+  const downloadSBOM = document.getElementById('downloadSBOM');
+  if (downloadSBOM) {
+    downloadSBOM.addEventListener('click', downloadSBOMHandler);
+  }
+
   elements.detailPanel.addEventListener('click', (e) => {
     if (e.target === elements.detailPanel) closeDetailPanel();
   });
@@ -440,3 +447,36 @@ function escapeHtml(text) {
 
 // Expose
 window.showDeviceDetail = showDeviceDetail;
+
+// SBOM Download Handler
+async function downloadSBOMHandler() {
+  if (!selectedDevice) return;
+  
+  const deviceId = selectedDevice.device_id;
+  const btn = document.getElementById('downloadSBOM');
+  const originalText = btn.innerHTML;
+  
+  btn.innerHTML = '<span class="btn-icon">⏳</span> Lade...';
+  btn.disabled = true;
+  
+  try {
+    const response = await fetch(`${API_BASE}/api/v1/devices/${deviceId}/sbom`);
+    if (!response.ok) throw new Error('SBOM Download fehlgeschlagen');
+    
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `sbom-${deviceId}.json`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  } catch (error) {
+    console.error('SBOM Download error:', error);
+    alert('Fehler beim Herunterladen der SBOM: ' + error.message);
+  } finally {
+    btn.innerHTML = originalText;
+    btn.disabled = false;
+  }
+}
