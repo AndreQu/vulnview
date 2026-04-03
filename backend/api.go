@@ -352,15 +352,35 @@ func getCVEHandler(w http.ResponseWriter, r *http.Request) {
 	cveID := chi.URLParam(r, "cve_id")
 	
 	var cve map[string]interface{}
+	var cveIDStr, desc, severity string
+	var cvssScore *float64
+	var cvssVector *string
+	var published, lastMod time.Time
+	var epssScore *float64
+	var cweIDs []string
+	var refsJSON []byte
+	
 	err := db.QueryRow(ctx, `
 		SELECT cve_id, description, cvss_score, cvss_vector, severity,
 		       published_date, last_modified, epss_score, cwe_ids, references
 		FROM cves WHERE cve_id = $1
 	`, cveID).Scan(
-		&cve["cve_id"], &cve["description"], &cve["cvss_score"],
-		&cve["cvss_vector"], &cve["severity"], &cve["published_date"],
-		&cve["last_modified"], &cve["epss_score"], &cve["cwe_ids"], &cve["references"],
+		&cveIDStr, &desc, &cvssScore, &cvssVector, &severity,
+		&published, &lastMod, &epssScore, &cweIDs, &refsJSON,
 	)
+	
+	cve := map[string]interface{}{
+		"cve_id":         cveIDStr,
+		"description":    desc,
+		"cvss_score":     cvssScore,
+		"cvss_vector":    cvssVector,
+		"severity":       severity,
+		"published_date": published,
+		"last_modified":  lastMod,
+		"epss_score":     epssScore,
+		"cwe_ids":        cweIDs,
+		"references":     json.RawMessage(refsJSON),
+	}
 	
 	if err != nil {
 		render.JSON(w, r, APIResponse{Success: false, Error: "CVE not found"})
