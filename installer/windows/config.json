@@ -1,0 +1,7 @@
+{
+  "server_url": "https://localhost:8443",
+  "client_cert": "",
+  "client_key": "",
+  "ca_cert": "",
+  "insecure": false
+}

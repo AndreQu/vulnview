@@ -1,0 +1,128 @@
+; VulnView Agent Installer
+; WiX Source File - Compiles to MSI
+
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
+     xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
+  
+  <Product Id="*"
+           Name="VulnView Agent"
+           Language="1033"
+           Version="1.0.0.0"
+           Manufacturer="VulnView"
+           UpgradeCode="12345678-1234-1234-1234-123456789ABC">
+    
+    <Package InstallerVersion="200"
+             Compressed="yes"
+             InstallScope="perMachine"
+             Platform="x64"
+             Description="VulnView Agent - System Inventory and Vulnerability Scanner"
+             Comments="VulnView Agent v1.0.0"
+             Languages="1033"/>
+    
+    <MajorUpgrade DowngradeErrorMessage="A newer version is already installed." />
+    
+    <MediaTemplate EmbedCab="yes" />
+    
+    <!-- Features -->
+    <Feature Id="ProductFeature" Title="VulnView Agent" Level="1">
+      <ComponentGroupRef Id="AgentComponents" />
+      <ComponentGroupRef Id="ServiceComponents" />
+      <ComponentGroupRef Id="ConfigComponents" />
+    </Feature>
+    
+    <!-- Properties for custom dialogs -->
+    <Property Id="BACKENDURL" Value="https://localhost:8443" />
+    
+    <!-- Custom Actions -->
+    <!-- Install service -->
+    <CustomAction Id="InstallService"
+                   Directory="INSTALLFOLDER"
+                   ExeCommand="[INSTALLFOLDER]vulnview-agent.exe install"
+                   Execute="deferred"
+                   Return="check"
+                   Impersonate="no" />
+    
+    <!-- Start service -->
+    <CustomAction Id="StartService"
+                   Directory="INSTALLFOLDER"
+                   ExeCommand="[INSTALLFOLDER]vulnview-agent.exe start"
+                   Execute="deferred"
+                   Return="check"
+                   Impersonate="no" />
+    
+    <!-- Stop service on uninstall -->
+    <CustomAction Id="StopService"
+                   Directory="INSTALLFOLDER"
+                   ExeCommand="[INSTALLFOLDER]vulnview-agent.exe stop"
+                   Execute="deferred"
+                   Return="ignore"
+                   Impersonate="no" />
+    
+    <!-- Uninstall service -->
+    <CustomAction Id="UninstallService"
+                   Directory="INSTALLFOLDER"
+                   ExeCommand="[INSTALLFOLDER]vulnview-agent.exe uninstall"
+                   Execute="deferred"
+                   Return="ignore"
+                   Impersonate="no" />
+    
+    <!-- Schedule custom actions -->
+    <InstallExecuteSequence>
+      <Custom Action="InstallService" After="InstallFiles">NOT Installed AND NOT REMOVE</Custom>
+      <Custom Action="StartService" After="InstallService">NOT Installed AND NOT REMOVE</Custom>
+      <Custom Action="StopService" Before="RemoveFiles">REMOVE="ALL"</Custom>
+      <Custom Action="UninstallService" After="StopService">REMOVE="ALL"</Custom>
+    </InstallExecuteSequence>
+    
+  </Product>
+  
+  <!-- Directory Structure -->
+  <Fragment>
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="INSTALLFOLDER" Name="VulnView Agent" />
+      </Directory>
+    </Directory>
+  </Fragment>
+  
+  <!-- Components -->
+  <Fragment>
+    <ComponentGroup Id="AgentComponents" Directory="INSTALLFOLDER">
+      <Component Id="AgentExecutable" Guid="87654321-4321-4321-4321-987654321CBA">
+        <File Id="AgentExe" Source="../agent/vulnview-agent.exe" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+    
+    <ComponentGroup Id="ConfigComponents" Directory="INSTALLFOLDER">
+      <Component Id="ConfigFile" Guid="ABCDEF12-3456-7890-ABCD-EF1234567890">
+        <File Id="ConfigJson" Source="config.json" KeyPath="yes" />
+        <!-- Allow config modification -->
+        <util:PermissionEx User="Everyone" GenericAll="yes" />
+      </Component>
+      
+      <Component Id="CACertificate" Guid="FEDCBA09-8765-4321-FEDC-BA0987654321">
+        <File Id="CACert" Source="ca.crt" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+  </Fragment>
+  
+  <!-- Service Components -->
+  <Fragment>
+    <ComponentGroup Id="ServiceComponents" Directory="INSTALLFOLDER">
+      <Component Id="ServiceComponent" Guid="11111111-2222-3333-4444-555555555555">
+        <!-- The actual service is installed by custom action, 
+             this component ensures proper cleanup -->
+        <RegistryValue Root="HKLM"
+                         Key="Software\VulnView\Agent"
+                         Name="Installed"
+                         Type="string"
+                         Value="1"
+                         KeyPath="yes" />
+        <RemoveFile Id="RemoveAgentExe" Name="vulnview-agent.exe" On="uninstall" />
+        <RemoveFolder Id="RemoveInstallFolder" On="uninstall" />
+      </Component>
+    </ComponentGroup>
+  </Fragment>
+  
+</Wix>

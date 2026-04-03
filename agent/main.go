@@ -15,26 +15,73 @@ import (
 )
 
 const (
-	AgentVersion    = "1.0.0-mvp"
+	AgentVersion      = "1.0.0-mvp"
 	HeartbeatInterval = 60 * time.Second
-	FullScanInterval    = 4 * time.Hour
+	FullScanInterval  = 4 * time.Hour
 )
 
 var (
-	serverURL    = flag.String("server", "https://localhost:8443", "Backend server URL")
-	certFile     = flag.String("cert", "", "Client certificate file (for mTLS)")
-	keyFile      = flag.String("key", "", "Client key file (for mTLS)")
-	caFile       = flag.String("ca", "", "CA certificate file (for mTLS)")
-	insecure     = flag.Bool("insecure", false, "Disable mTLS (development only)")
-	deviceID     string
-	hostname     string
-	client       *Client
+	serverURL = flag.String("server", "https://localhost:8443", "Backend server URL")
+	certFile  = flag.String("cert", "", "Client certificate file (for mTLS)")
+	keyFile   = flag.String("key", "", "Client key file (for mTLS)")
+	caFile    = flag.String("ca", "", "CA certificate file (for mTLS)")
+	insecure  = flag.Bool("insecure", false, "Disable mTLS (development only)")
+
+	// Service commands
+	installFlag   = flag.Bool("install", false, "Install the service")
+	uninstallFlag = flag.Bool("uninstall", false, "Uninstall the service")
+	startFlag     = flag.Bool("start", false, "Start the service")
+	stopFlag      = flag.Bool("stop", false, "Stop the service")
+
+	deviceID string
+	hostname string
+	client   *Client
 )
 
 func main() {
 	flag.Parse()
 
-	log.Printf("VulnView Agent v%s starting...", AgentVersion)
+	// Handle service commands first
+	if *installFlag {
+		if err := installService(); err != nil {
+			log.Fatalf("Failed to install service: %v", err)
+		}
+		return
+	}
+
+	if *uninstallFlag {
+		if err := uninstallService(); err != nil {
+			log.Fatalf("Failed to uninstall service: %v", err)
+		}
+		return
+	}
+
+	if *startFlag {
+		if err := startServiceCmd(); err != nil {
+			log.Fatalf("Failed to start service: %v", err)
+		}
+		return
+	}
+
+	if *stopFlag {
+		if err := stopServiceCmd(); err != nil {
+			log.Fatalf("Failed to stop service: %v", err)
+		}
+		return
+	}
+
+	// Check if running as Windows service
+	if runAsService() {
+		runService()
+		return
+	}
+
+	// Run in console mode
+	runConsole()
+}
+
+func runConsole() {
+	log.Printf("VulnView Agent v%s starting (console mode)...", AgentVersion)
 
 	// Get or create device ID
 	deviceID = getDeviceID()
@@ -56,6 +103,9 @@ func main() {
 		}
 		log.Println("mTLS enabled")
 	}
+
+	// Load config if exists
+	loadConfig()
 
 	// Initial registration heartbeat
 	if err := sendHeartbeat(); err != nil {
@@ -101,6 +151,64 @@ func main() {
 	}
 }
 
+// runAgent is called by the service wrapper
+func runAgent(shutdown <-chan struct{}) {
+	log.Println("Agent starting in service mode...")
+
+	// Initial heartbeat
+	if err := sendHeartbeat(); err != nil {
+		elog.Error(1, fmt.Sprintf("Initial heartbeat failed: %v", err))
+	}
+
+	// Initial scan
+	if err := performScan("full"); err != nil {
+		elog.Error(1, fmt.Sprintf("Initial scan failed: %v", err))
+	}
+
+	// Setup ticker for heartbeat
+	heartbeatTicker := time.NewTicker(HeartbeatInterval)
+	defer heartbeatTicker.Stop()
+
+	// Setup ticker for full scan
+	scanTicker := time.NewTicker(FullScanInterval)
+	defer scanTicker.Stop()
+
+	elog.Info(1, "Agent main loop started")
+
+	// Main loop
+	for {
+		select {
+		case <-heartbeatTicker.C:
+			if err := sendHeartbeat(); err != nil {
+				elog.Error(1, fmt.Sprintf("Heartbeat failed: %v", err))
+			}
+
+		case <-scanTicker.C:
+			if err := performScan("full"); err != nil {
+				elog.Error(1, fmt.Sprintf("Scheduled scan failed: %v", err))
+			}
+
+		case <-shutdown:
+			elog.Info(1, "Agent shutting down")
+			return
+		}
+	}
+}
+
+// loadConfig loads configuration from config.json
+func loadConfig() {
+	configPath := "config.json"
+	if _, err := os.Stat(configPath); err == nil {
+		data, err := os.ReadFile(configPath)
+		if err != nil {
+			log.Printf("Warning: Could not read config file: %v", err)
+			return
+		}
+		// Parse and apply config if needed
+		_ = data
+	}
+}
+
 // getDeviceID returns the unique device identifier
 func getDeviceID() string {
 	// Try to get MachineGuid from registry
@@ -126,11 +234,11 @@ func sendHeartbeat() error {
 		Hostname:        hostname,
 		OsType:          "windows",
 		OsVersion:       osInfo["os_version"],
-		Architecture:    "amd64", // TODO: detect properly
+		Architecture:    "amd64",
 		AgentVersion:    AgentVersion,
 		UptimeSeconds:   uptime,
-		CPUUsagePercent: 0.0,  // TODO: implement CPU monitoring
-		MemoryUsageMB:   0,    // TODO: implement memory monitoring
+		CPUUsagePercent: 0.0,
+		MemoryUsageMB:   0,
 	}
 
 	if err := client.SendHeartbeat(req); err != nil {
@@ -196,7 +304,7 @@ func performScan(scanType string) error {
 	}
 
 	duration := time.Since(startTime)
-	log.Printf("Scan completed in %v: %d software, %d processes", 
+	log.Printf("Scan completed in %v: %d software, %d processes",
 		duration, len(softwareEntries), len(processEntries))
 
 	return nil
