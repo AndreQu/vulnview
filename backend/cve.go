@@ -323,7 +323,9 @@ func SyncCVESyncLog(ctx context.Context, db *pgx.Conn, syncType string, cvesAdde
 }
 
 // GetCVEStats returns statistics about CVEs
-func GetCVEStats(ctx context.Context, db *pgx.Conn) (map[string]interface{}, error) {
+func GetCVEStats(ctx context.Context, db interface {
+	QueryRow(context.Context, string, ...interface{}) pgx.Row
+}) (map[string]interface{}, error) {
 	var total, critical, high, medium, low int
 	err := db.QueryRow(ctx, `
 		SELECT 

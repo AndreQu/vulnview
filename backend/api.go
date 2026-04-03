@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -11,6 +10,7 @@ import (
 	"github.com/go-chi/render"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // API handles all HTTP routes
@@ -369,7 +369,7 @@ func getCVEHandler(w http.ResponseWriter, r *http.Request) {
 		&published, &lastMod, &epssScore, &cweIDs, &refsJSON,
 	)
 	
-	cve := map[string]interface{}{
+	cveData := map[string]interface{}{
 		"cve_id":         cveIDStr,
 		"description":    desc,
 		"cvss_score":     cvssScore,
@@ -387,7 +387,7 @@ func getCVEHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	render.JSON(w, r, APIResponse{Success: true, Data: cve})
+	render.JSON(w, r, APIResponse{Success: true, Data: cveData})
 }
 
 // vulnerabilityStatsHandler returns vulnerability statistics
