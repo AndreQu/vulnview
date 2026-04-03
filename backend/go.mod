@@ -6,8 +6,7 @@ require (
 	github.com/go-chi/chi/v5 v5.0.10
 	github.com/go-chi/render v1.0.3
 	github.com/google/uuid v1.5.0
-	github.com/jackc/pgx/v5 v5.5.1
-	github.com/jackc/pgxutil v0.0.0-20230115134304-1ac9705a7d0a
+	github.com/jackc/pgx/v5 v5.5.0
 )
 
 require (
