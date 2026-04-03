@@ -1,67 +1,58 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="de" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VulnView</title>
+    <title>VulnView Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="cve-styles.css">
 </head>
 <body>
-    <div id="app" class="app">
-        <!-- Sidebar -->
+    <div class="app">
         <aside class="sidebar">
             <div class="sidebar-brand">
-                <div class="logo">
-                    <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-                        <rect width="28" height="28" rx="7" fill="var(--accent)"/>
-                        <path d="M14 7L21 21H7L14 7Z" fill="white"/>
-                    </svg>
-                </div>
+                <div class="logo">V</div>
                 <span class="brand-text">VulnView</span>
             </div>
-            
             <nav class="sidebar-nav">
-                <a href="#dashboard" class="nav-item active" data-page="dashboard">
+                <a class="nav-item active" data-page="dashboard">
                     <span class="nav-icon">◦</span>
-                    <span class="nav-label">Dashboard</span>
+                    <span>Dashboard</span>
                 </a>
-                <a href="#devices" class="nav-item" data-page="devices">
+                <a class="nav-item" data-page="devices">
                     <span class="nav-icon">◦</span>
-                    <span class="nav-label">Geräte</span>
+                    <span>Geräte</span>
                 </a>
-                <a href="#software" class="nav-item" data-page="software">
+                <a class="nav-item" data-page="software">
                     <span class="nav-icon">◦</span>
-                    <span class="nav-label">Software</span>
+                    <span>Software</span>
                 </a>
-                <a href="#vulnerabilities" class="nav-item" data-page="vulnerabilities">
+                <a class="nav-item" data-page="vulnerabilities">
                     <span class="nav-icon">◦</span>
-                    <span class="nav-label">Schwachstellen</span>
+                    <span>CVEs</span>
                 </a>
             </nav>
-            
             <div class="sidebar-footer">
                 <button class="theme-toggle" id="themeToggle">
-                    <span class="theme-icon">◐</span>
-                    <span class="theme-label">Erscheinungsbild</span>
+                    <span>◐</span>
+                    <span>Erscheinungsbild</span>
                 </button>
             </div>
         </aside>
 
-        <!-- Main Content -->
         <main class="main">
-            <!-- Header -->
             <header class="header">
                 <div class="header-content">
-                    <h1 class="page-title">Dashboard</h1>
-                    <p class="page-subtitle">Übersicht Ihrer Endpoints</p>
+                    <h1>Dashboard</h1>
+                    <p>Übersicht Ihrer Endpoints und Schwachstellen</p>
                 </div>
                 <div class="header-actions">
                     <div class="status-pill" id="apiStatus">
                         <span class="status-dot"></span>
-                        <span class="status-text">Verbindung wird hergestellt</span>
+                        <span class="status-text">Verbindung wird hergestellt...</span>
                     </div>
                     <button class="btn btn-primary" id="refreshBtn">
                         <span class="btn-icon">↻</span>
@@ -70,44 +61,57 @@
                 </div>
             </header>
 
-            <!-- Content -->
             <div class="content">
                 <!-- Stats Grid -->
                 <div class="stats-grid">
-                    <div class="stat-card glass">
+                    <div class="stat-card">
                         <div class="stat-header">
                             <span class="stat-label">Geräte</span>
                             <span class="stat-icon">🖥</span>
                         </div>
                         <div class="stat-value" id="totalDevices">—</div>
-                        <div class="stat-change positive">+2 diese Woche</div>
+                        <div class="stat-desc">Inventarisiert</div>
                     </div>
                     
-                    <div class="stat-card glass">
+                    <div class="stat-card">
                         <div class="stat-header">
                             <span class="stat-label">Online</span>
-                            <span class="stat-icon online">●</span>
+                            <span class="stat-icon" style="color: var(--success)">●</span>
                         </div>
-                        <div class="stat-value" id="onlineDevices">—</div>
-                        <div class="stat-change" id="onlinePercent">—% aktiv</div>
+                        <div class="stat-value" style="color: var(--success)" id="onlineDevices">—</div>
+                        <div class="stat-desc" id="onlinePercent">—% aktiv</div>
                     </div>
                     
-                    <div class="stat-card glass">
+                    <div class="stat-card">
                         <div class="stat-header">
                             <span class="stat-label">Software</span>
-                            <span class="stat-icon">◫</span>
+                            <span class="stat-icon">📦</span>
                         </div>
                         <div class="stat-value" id="totalSoftware">—</div>
-                        <div class="stat-change">Inventarisiert</div>
+                        <div class="stat-desc">Pakete</div>
                     </div>
                     
-                    <div class="stat-card glass accent">
+                    <div class="stat-card critical" id="criticalCard">
                         <div class="stat-header">
-                            <span class="stat-label">Risiko-Score</span>
-                            <span class="stat-icon">◈</span>
+                            <span class="stat-label">Kritische CVEs</span>
+                            <span class="stat-icon">⚠</span>
                         </div>
-                        <div class="stat-value" id="riskScore">—</div>
-                        <div class="stat-change">Durchschnitt</div>
+                        <div class="stat-value" id="criticalCves">—</div>
+                        <div class="stat-desc">Sofort handeln</div>
+                    </div>
+                </div>
+
+                <!-- Filter Buttons -->
+                <div class="filter-bar">
+                    <div class="filter-group">
+                        <button class="filter-btn active" data-filter="all">Alle Geräte</button>
+                        <button class="filter-btn" data-filter="critical">Nur Kritisch</button>
+                        <button class="filter-btn" data-filter="offline">Offline</button>
+                    </div>
+                    
+                    <div class="search-field">
+                        <input type="text" class="search-input" id="deviceSearch" placeholder="Gerät suchen...">
+                        <span class="search-icon">⌕</span>
                     </div>
                 </div>
 
@@ -115,28 +119,23 @@
                 <section class="section">
                     <div class="section-header">
                         <h2 class="section-title">Geräte</h2>
-                        <div class="section-actions">
-                            <div class="search-field">
-                                <input type="text" class="search-input" id="deviceSearch" placeholder="Gerät suchen...">
-                                <span class="search-icon">⌕</span>
-                            </div>
-                        </div>
                     </div>
-                    
-                    <div class="table-container glass">
+
+                    <div class="table-container">
                         <table class="data-table" id="devicesTable">
                             <thead>
                                 <tr>
                                     <th>Gerät</th>
                                     <th>System</th>
-                                    <th>Agent</th>
+                                    <th>Software</th>
+                                    <th>CVEs</th>
                                     <th>Status</th>
                                     <th>Zuletzt aktiv</th>
                                 </tr>
                             </thead>
                             <tbody id="devicesTableBody">
                                 <tr>
-                                    <td colspan="5" class="loading-state">
+                                    <td colspan="6" class="loading-state">
                                         <div class="loading-spinner"></div>
                                         <p>Geräte werden geladen...</p>
                                     </td>
@@ -148,7 +147,7 @@
             </div>
         </main>
 
-        <!-- Detail Panel (Slide-in) -->
+        <!-- Detail Panel -->
         <aside class="detail-panel" id="detailPanel">
             <div class="detail-panel-inner">
                 <div class="detail-header">
@@ -158,18 +157,32 @@
                     <p class="detail-subtitle" id="detailSubtitle">Details</p>
                 </div>
                 
+                <div class="detail-tabs">
+                    <button class="detail-tab active" data-tab="software">Software</button>
+                    <button class="detail-tab" data-tab="cves">CVEs</button>
+                </div>
+                
                 <div class="detail-content">
-                    <div class="detail-section">
-                        <h3>Systeminformationen</h3>
-                        <div class="info-grid" id="deviceInfo">
-                            <!-- Dynamic content -->
+                    <!-- Software Tab -->
+                    <div class="tab-content active" id="softwareTab">
+                        <div class="software-list" id="softwareList">
+                            <div class="loading-state">
+                                <div class="loading-spinner"></div>
+                                <p>Software wird geladen...</p>
+                            </div>
                         </div>
                     </div>
                     
-                    <div class="detail-section">
-                        <h3>Software-Inventar</h3>
-                        <div class="software-list" id="softwareList">
-                            <!-- Dynamic content -->
+                    <!-- CVEs Tab -->
+                    <div class="tab-content" id="cvesTab">
+                        <div class="cve-summary" id="cveSummary">
+                            <!-- CVE Summary Cards -->
+                        </div>
+                        <div class="cve-list" id="cveList">
+                            <div class="loading-state">
+                                <div class="loading-spinner"></div>
+                                <p>CVEs werden geladen...</p>
+                            </div>
                         </div>
                     </div>
                 </div>
