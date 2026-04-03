@@ -10,7 +10,6 @@ import (
 	"github.com/go-chi/render"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // API handles all HTTP routes
@@ -351,7 +350,6 @@ func getCVEHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	cveID := chi.URLParam(r, "cve_id")
 	
-	var cve map[string]interface{}
 	var cveIDStr, desc, severity string
 	var cvssScore *float64
 	var cvssVector *string
@@ -369,6 +367,11 @@ func getCVEHandler(w http.ResponseWriter, r *http.Request) {
 		&published, &lastMod, &epssScore, &cweIDs, &refsJSON,
 	)
 	
+	if err != nil {
+		render.JSON(w, r, APIResponse{Success: false, Error: "CVE not found"})
+		return
+	}
+	
 	cveData := map[string]interface{}{
 		"cve_id":         cveIDStr,
 		"description":    desc,
@@ -380,11 +383,6 @@ func getCVEHandler(w http.ResponseWriter, r *http.Request) {
 		"epss_score":     epssScore,
 		"cwe_ids":        cweIDs,
 		"references":     json.RawMessage(refsJSON),
-	}
-	
-	if err != nil {
-		render.JSON(w, r, APIResponse{Success: false, Error: "CVE not found"})
-		return
 	}
 	
 	render.JSON(w, r, APIResponse{Success: true, Data: cveData})
@@ -461,8 +459,6 @@ func getDeviceVulnerabilitiesHandler(w http.ResponseWriter, r *http.Request) {
 
 // syncCVEsHandler triggers a CVE sync from NVD
 func syncCVEsHandler(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	
 	// This would typically run as a background job
 	// For now, we return immediately with a message
 	render.JSON(w, r, APIResponse{
