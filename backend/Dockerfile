@@ -5,8 +5,14 @@ WORKDIR /app
 # Install dependencies
 RUN apk add --no-cache git ca-certificates
 
-# Copy go mod files
-COPY go.mod go.sum ./
+# Copy go.mod first (go.sum will be generated)
+COPY go.mod ./
+
+# Generate go.sum automatically with go mod tidy
+RUN go mod tidy
+
+# Now copy go.sum (which now exists) and download dependencies
+COPY go.sum ./
 RUN go mod download
 
 # Copy source code
