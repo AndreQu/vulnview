@@ -23,28 +23,17 @@ func InitDB() error {
 		return fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	// Create tables
-	schema := `
-	CREATE TABLE IF NOT EXISTS devices (
-		id TEXT PRIMARY KEY,
-		name TEXT,
-		os TEXT,
-		os_version TEXT,
-		last_seen DATETIME,
-		ip_address TEXT,
-		status TEXT
-	);
-	CREATE TABLE IF NOT EXISTS software (
-		id TEXT PRIMARY KEY,
-		device_id TEXT,
-		name TEXT,
-		version TEXT,
-		vendor TEXT,
-		install_date DATETIME
-	);
-	`
-	_, err = db.Exec(schema)
+	if _, err := db.Exec("PRAGMA foreign_keys = ON"); err != nil {
+		return fmt.Errorf("failed to enable foreign keys: %w", err)
+	}
+
+	schemaPath := getEnv("DB_SCHEMA_PATH", "./init.sql")
+	schema, err := os.ReadFile(schemaPath)
 	if err != nil {
+		return fmt.Errorf("failed to read schema file %s: %w", schemaPath, err)
+	}
+
+	if _, err := db.Exec(string(schema)); err != nil {
 		return fmt.Errorf("failed to create schema: %w", err)
 	}
 
