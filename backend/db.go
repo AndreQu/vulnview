@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -16,7 +17,7 @@ var db *pgxpool.Pool
 func InitDB() error {
 	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
 		getEnv("DB_USER", "vulnview"),
-		getEnv("DB_PASSWORD", "vulnview_secret_2026"),
+		getEnv("DB_PASSWORD", "vulnview"),
 		getEnv("DB_HOST", "localhost"),
 		getEnv("DB_PORT", "5432"),
 		getEnv("DB_NAME", "vulnview"),
@@ -43,6 +44,34 @@ func InitDB() error {
 
 	if err := db.Ping(ctx); err != nil {
 		return fmt.Errorf("failed to ping database: %w", err)
+	}
+
+	if err := InitSchema(ctx); err != nil {
+		return fmt.Errorf("failed to initialize schema: %w", err)
+	}
+
+	return nil
+}
+
+// InitSchema executes the SQL schema file to ensure required tables exist.
+func InitSchema(ctx context.Context) error {
+	schemaPath := getEnv("DB_INIT_SQL", "init.sql")
+	content, err := os.ReadFile(schemaPath)
+	if err != nil {
+		// Fallback to the executable directory so deployments still work
+		// when started from a different cwd.
+		execPath, pathErr := os.Executable()
+		if pathErr == nil {
+			altPath := filepath.Join(filepath.Dir(execPath), "init.sql")
+			content, err = os.ReadFile(altPath)
+		}
+		if err != nil {
+			return fmt.Errorf("failed to read schema file %q: %w", schemaPath, err)
+		}
+	}
+
+	if _, err := db.Exec(ctx, string(content)); err != nil {
+		return fmt.Errorf("failed to execute schema: %w", err)
 	}
 
 	return nil

@@ -16,20 +16,22 @@ import (
 func API(r chi.Router) {
 	r.Get("/health", healthHandler)
 	r.Get("/api/v1/devices", listDevicesHandler)
+	r.Get("/api/v1/stats", vulnerabilityStatsHandler) // backward-compatible alias
+	r.Get("/api/v1/cves", listVulnerabilitiesHandler) // backward-compatible alias
 	r.Get("/api/v1/devices/{id}", getDeviceHandler)
 	r.Get("/api/v1/devices/{id}/software", getDeviceSoftwareHandler)
 	r.Get("/api/v1/devices/{id}/vulnerabilities", getDeviceVulnerabilitiesHandler)
 	r.Post("/api/v1/heartbeat", heartbeatHandler)
 	r.Post("/api/v1/scan", scanHandler)
-	
+
 	// SBOM Endpoint
 	r.Get("/api/v1/devices/{id}/sbom", sbomHandler)
-	
+
 	// CVE Endpoints
 	r.Get("/api/v1/vulnerabilities", listVulnerabilitiesHandler)
 	r.Get("/api/v1/vulnerabilities/stats", vulnerabilityStatsHandler)
 	r.Get("/api/v1/vulnerabilities/{cve_id}", getCVEHandler)
-	
+
 	// Admin/Sync endpoints
 	r.Post("/api/v1/admin/sync-cves", syncCVEsHandler)
 }
@@ -49,7 +51,7 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 // listDevicesHandler returns all devices
 func listDevicesHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	
+
 	rows, err := db.Query(ctx, `
 		SELECT id, device_id, hostname, os_type, os_version, last_seen, is_online, agent_version
 		FROM devices
@@ -64,20 +66,20 @@ func listDevicesHandler(w http.ResponseWriter, r *http.Request) {
 	var devices []map[string]interface{}
 	for rows.Next() {
 		var d Device
-		err := rows.Scan(&d.ID, &d.DeviceID, &d.Hostname, &d.OsType, &d.OsVersion, 
+		err := rows.Scan(&d.ID, &d.DeviceID, &d.Hostname, &d.OsType, &d.OsVersion,
 			&d.LastSeen, &d.IsOnline, &d.AgentVersion)
 		if err != nil {
 			continue
 		}
 		devices = append(devices, map[string]interface{}{
-			"id":             d.ID,
-			"device_id":      d.DeviceID,
-			"hostname":       d.Hostname,
-			"os_type":        d.OsType,
-			"os_version":     d.OsVersion,
-			"last_seen":      d.LastSeen,
-			"is_online":      d.IsOnline,
-			"agent_version":  d.AgentVersion,
+			"id":            d.ID,
+			"device_id":     d.DeviceID,
+			"hostname":      d.Hostname,
+			"os_type":       d.OsType,
+			"os_version":    d.OsVersion,
+			"last_seen":     d.LastSeen,
+			"is_online":     d.IsOnline,
+			"agent_version": d.AgentVersion,
 		})
 	}
 
@@ -134,7 +136,7 @@ func getDeviceSoftwareHandler(w http.ResponseWriter, r *http.Request) {
 	var software []Software
 	for rows.Next() {
 		var s Software
-		err := rows.Scan(&s.Name, &s.Version, &s.Publisher, &s.InstallPath, 
+		err := rows.Scan(&s.Name, &s.Version, &s.Publisher, &s.InstallPath,
 			&s.Source, &s.FirstSeen, &s.LastSeen)
 		if err != nil {
 			continue
@@ -290,7 +292,7 @@ func scanHandler(w http.ResponseWriter, r *http.Request) {
 // listVulnerabilitiesHandler returns all CVEs with optional filters
 func listVulnerabilitiesHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	
+
 	severity := r.URL.Query().Get("severity")
 	limit := 100
 	if l := r.URL.Query().Get("limit"); l != "" {
@@ -298,50 +300,50 @@ func listVulnerabilitiesHandler(w http.ResponseWriter, r *http.Request) {
 			limit = parsed
 		}
 	}
-	
+
 	query := `
 		SELECT cve_id, description, cvss_score, severity, published_date, epss_score
 		FROM cves
 		WHERE 1=1
 	`
 	params := []interface{}{}
-	
+
 	if severity != "" {
 		query += ` AND severity = $1`
 		params = append(params, severity)
 	}
-	
+
 	query += ` ORDER BY cvss_score DESC NULLS LAST LIMIT $` + strconv.Itoa(len(params)+1)
 	params = append(params, limit)
-	
+
 	rows, err := db.Query(ctx, query, params...)
 	if err != nil {
 		render.JSON(w, r, APIResponse{Success: false, Error: err.Error()})
 		return
 	}
 	defer rows.Close()
-	
+
 	var cves []map[string]interface{}
 	for rows.Next() {
 		var cveID, desc, severity string
 		var cvssScore *float64
 		var epssScore *float64
 		var published time.Time
-		
+
 		if err := rows.Scan(&cveID, &desc, &cvssScore, &severity, &published, &epssScore); err != nil {
 			continue
 		}
-		
+
 		cves = append(cves, map[string]interface{}{
-			"cve_id":        cveID,
-			"description":   desc,
-			"cvss_score":    cvssScore,
-			"severity":      severity,
-			"published":     published,
-			"epss_score":    epssScore,
+			"cve_id":      cveID,
+			"description": desc,
+			"cvss_score":  cvssScore,
+			"severity":    severity,
+			"published":   published,
+			"epss_score":  epssScore,
 		})
 	}
-	
+
 	render.JSON(w, r, APIResponse{Success: true, Data: cves})
 }
 
@@ -349,7 +351,7 @@ func listVulnerabilitiesHandler(w http.ResponseWriter, r *http.Request) {
 func getCVEHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	cveID := chi.URLParam(r, "cve_id")
-	
+
 	var cveIDStr, desc, severity string
 	var cvssScore *float64
 	var cvssVector *string
@@ -357,21 +359,21 @@ func getCVEHandler(w http.ResponseWriter, r *http.Request) {
 	var epssScore *float64
 	var cweIDs []string
 	var refsJSON []byte
-	
+
 	err := db.QueryRow(ctx, `
 		SELECT cve_id, description, cvss_score, cvss_vector, severity,
-		       published_date, last_modified, epss_score, cwe_ids, references
+		       published_date, last_modified, epss_score, cwe_ids, "references"
 		FROM cves WHERE cve_id = $1
 	`, cveID).Scan(
 		&cveIDStr, &desc, &cvssScore, &cvssVector, &severity,
 		&published, &lastMod, &epssScore, &cweIDs, &refsJSON,
 	)
-	
+
 	if err != nil {
 		render.JSON(w, r, APIResponse{Success: false, Error: "CVE not found"})
 		return
 	}
-	
+
 	cveData := map[string]interface{}{
 		"cve_id":         cveIDStr,
 		"description":    desc,
@@ -384,20 +386,20 @@ func getCVEHandler(w http.ResponseWriter, r *http.Request) {
 		"cwe_ids":        cweIDs,
 		"references":     json.RawMessage(refsJSON),
 	}
-	
+
 	render.JSON(w, r, APIResponse{Success: true, Data: cveData})
 }
 
 // vulnerabilityStatsHandler returns vulnerability statistics
 func vulnerabilityStatsHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	
+
 	stats, err := GetCVEStats(ctx, db)
 	if err != nil {
 		render.JSON(w, r, APIResponse{Success: false, Error: err.Error()})
 		return
 	}
-	
+
 	render.JSON(w, r, APIResponse{Success: true, Data: stats})
 }
 
@@ -405,7 +407,7 @@ func vulnerabilityStatsHandler(w http.ResponseWriter, r *http.Request) {
 func getDeviceVulnerabilitiesHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	deviceID := chi.URLParam(r, "id")
-	
+
 	// Get device UUID
 	var deviceUUID uuid.UUID
 	err := db.QueryRow(ctx, `SELECT id FROM devices WHERE device_id = $1`, deviceID).Scan(&deviceUUID)
@@ -413,7 +415,7 @@ func getDeviceVulnerabilitiesHandler(w http.ResponseWriter, r *http.Request) {
 		render.JSON(w, r, APIResponse{Success: false, Error: "Device not found"})
 		return
 	}
-	
+
 	// Get vulnerabilities with software details
 	rows, err := db.Query(ctx, `
 		SELECT sv.id, c.cve_id, c.description, c.cvss_score, c.severity,
@@ -424,36 +426,36 @@ func getDeviceVulnerabilitiesHandler(w http.ResponseWriter, r *http.Request) {
 		WHERE s.device_id = $1
 		ORDER BY sv.risk_score DESC NULLS LAST
 	`, deviceUUID)
-	
+
 	if err != nil {
 		render.JSON(w, r, APIResponse{Success: false, Error: err.Error()})
 		return
 	}
 	defer rows.Close()
-	
+
 	var vulns []map[string]interface{}
 	for rows.Next() {
 		var id, cveID, desc, severity, status, swName, swVersion string
 		var cvssScore, riskScore *float64
-		
+
 		if err := rows.Scan(&id, &cveID, &desc, &cvssScore, &severity,
 			&riskScore, &status, &swName, &swVersion); err != nil {
 			continue
 		}
-		
+
 		vulns = append(vulns, map[string]interface{}{
-			"id":              id,
-			"cve_id":          cveID,
-			"description":     desc,
-			"cvss_score":      cvssScore,
-			"severity":        severity,
-			"risk_score":      riskScore,
-			"status":          status,
-			"software_name":   swName,
+			"id":               id,
+			"cve_id":           cveID,
+			"description":      desc,
+			"cvss_score":       cvssScore,
+			"severity":         severity,
+			"risk_score":       riskScore,
+			"status":           status,
+			"software_name":    swName,
 			"software_version": swVersion,
 		})
 	}
-	
+
 	render.JSON(w, r, APIResponse{Success: true, Data: vulns})
 }
 
