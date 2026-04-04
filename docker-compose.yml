@@ -4,11 +4,10 @@ services:
   backend:
     build: ./backend
     container_name: vulnview-backend
-    ports:
-      - "8080:8080"
     environment:
       PORT: 8080
       DB_PATH: /data/vulnview.db
     volumes:
       - ./data:/data
     restart: unless-stopped
+    # KEIN ports: - laeuft nur intern im Docker-Netzwerk
