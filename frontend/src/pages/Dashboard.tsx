@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { getDevices, getCVEs, getStats } from '../api/client';
 import { motion } from 'framer-motion';
-import { Shield, AlertTriangle, Activity } from 'lucide-react';
+import { Shield, AlertTriangle, Activity, Server } from 'lucide-react';
+import { getDevices, getCVEs, getStats } from '../api/client';
 
 interface Device {
   id: string;
@@ -33,7 +33,7 @@ interface Stats {
 export function Dashboard() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [cves, setCves] = useState<CVE[]>([]);
-  const [stats, setStats] = useState<Stats | {}>({});
+  const [stats, setStats] = useState<Stats>({ total_devices: 0, critical_count: 0, high_count: 0, medium_count: 0, low_count: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,9 +52,9 @@ export function Dashboard() {
       ]);
       setDevices(d || []);
       setCves(c || []);
-      setStats(s || {});
+      setStats(s || { total_devices: 0, critical_count: 0, high_count: 0, medium_count: 0, low_count: 0 });
     } catch (err) {
-      setError('Failed to load data');
+      setError('Failed to load data: ' + (err as Error).message);
       console.error(err);
     } finally {
       setLoading(false);
@@ -62,21 +62,28 @@ export function Dashboard() {
   };
 
   const getSeverityIcon = (severity: string) => {
-       switch(severity) {
-      case 'critical': return <AlertTriangle className="w-4 h-4 text-red-500" />;
-      case 'high': return <AlertTriangle className="w-4 h-4 text-orange-500" />;
-      case 'medium': return <AlertTriangle className="w-4 h-4 text-yellow-500" />;
-      case 'low': return <AlertTriangle className="w-4 h-4 text-blue-500" />;
-      default: return <Shield className="w-4 h-4 text-gray-500" />;
-    }
+    const colors: Record<string, string> = {
+      critical: 'text-red-500',
+      high: 'text-orange-500',
+      medium: 'text-yellow-500',
+      low: 'text-blue-500'
+    };
+    const icons: Record<string, React.ComponentType<{ className?: string }> = {
+      critical: AlertTriangle,
+      high: AlertTriangle,
+      medium: AlertTriangle,
+      low: Shield
+    };
+    const Icon = icons[severity] || Shield;
+    return <Icon className={`w-5 h-5 ${colors[severity]}`} />;
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <motion.div
-          animate={{ opacity: [0.5, 1] }}
-          transition={{ duration: 0.8, repeat: Infinity }}
+          animate={{ opacity: [0.5, 1, 0.5, 1] }
+          transition={{ duration: 1.5, repeat: Infinity }}
           className="text-xl text-gray-500"
         >
           Loading...
@@ -87,10 +94,10 @@ export function Dashboard() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <p className="text-red-500 mb-4">{error}</p>
-          <button 
+          <button
             onClick={loadData}
             className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
           >
@@ -102,112 +109,114 @@ export function Dashboard() {
   }
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="bg-white/70 backdrop-blur-xl rounded-2xl p-6 shadow-[0_2px_12px_rgba(0,0,0,0.08)] border border-white/20"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <Shield className="w-8 h-8 text-blue-500" />
-            <span className="text-2xl font-bold">{stats.total_devices || 0}</span>
-          </div>
-          <p className="text-sm text-gray-600">Devices</p>
-        </motion.div>
+    <div className="min-h-screen bg-gray-50 p-8">
+      {/* Header */}
+      <header className="bg-white/80 backdrop-blur-xl border-b border-gray-200/50 px-8 py-4 mb-8">
+        <div className="flex items-center gap-3">
+          <Shield className="w-8 h-8 text-blue-600" />
+          <h1 className="text-2xl font-semibold text-gray-900">VulnView Dashboard</h1>
+        </div>
+      </header>
 
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          className="bg-white/70 backdrop-blur-xl rounded-2xl p-6 shadow-[0_2px_12px_rgba(0,0,0,0.08)] border border-white/20"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <AlertTriangle className="w-8 h-8 text-red-500" />
-            <span className="text-2xl font-bold">{stats.critical_count || 0}</span>
-          </div>
-          <p className="text-sm text-gray-600">Critical</p>
-        </motion.div>
+      {/* Stats */}
+      <div className="max-w-7xl mx-auto p-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          {[
+            { title: 'Total Devices', value: stats.total_devices, color: 'blue' },
+            { title: 'Critical', value: stats.critical_count, color: 'red' },
+            { title: 'High', value: stats.high_count, color: 'orange' },
+            { title: 'Medium', value: stats.medium_count, color: 'yellow' }
+          ].map((stat, i) => (
+            <motion.div
+              key={stat.title}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: i * 0.1 }}
+              className="bg-white/80 backdrop-blur-xl rounded-2xl p-6 shadow-lg border border-white/50"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-gray-600">{stat.title}</span>
+                <span className={`text-3xl font-bold ${
+                  stat.color === 'blue' ? 'text-blue-500' :
+                  stat.color === 'red' ? 'text-red-500' :
+                  stat.color === 'orange' ? 'text-orange-500' : 'text-yellow-500'
+                }`}>{stat.value}</span>
+              </div>
+              <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${
+                    stat.color === 'blue' ? 'bg-blue-500' :
+                    stat.color === 'red' ? 'bg-red-500' :
+                    stat.color === 'orange' ? 'bg-orange-500' : 'bg-yellow-500'
+                  }}
+                  style={{ width: '60%' }}
+                />
+              </div>
+            </motion.div>
+          ))}
+        </div>
 
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          className="bg-white/70 backdrop-blur-xl rounded-2xl p-6 shadow-[0_2px_12px_rgba(0,0,0,0.08)] border border-white/20"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <AlertTriangle className="w-8 h-8 text-orange-500" />
-            <span className="text-2xl font-bold">{stats.high_count || 0}</span>
-          </div>
-          <p className="text-sm text-gray-600">High</p>
-        </motion.div>
+        {/* Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.4 }}
+            className="bg-white/80 backdrop-blur-xl rounded-2xl p-6 shadow-lg border border-white/50"
+          >
+            <h3 className="text-lg font-semibold mb-4 text-gray-800">CVSS Score Distribution</h3>
+            <p className="text-gray-500 text-sm">Chart coming soon...</p>
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.5 }}
+            className="bg-white/80 backdrop-blur-xl rounded-2xl p-6 shadow-lg border border-white/50"
+          >
+            <h3 className="text-lg font-semibold mb-4 text-gray-800">Severity Timeline</h3>
+            <p className="text-gray-500 text-sm">Chart coming soon...</p>
+          </motion.div>
+        </div>
 
-        <motion.div 
+        {/* Devices Table */}
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-          className="bg-white/70 backdrop-blur-xl rounded-2xl p-6 shadow-[0_2px_12px_rgba(0,0,0,0.08)] border border-white/20"
+          transition={{ duration: 0.5, delay: 0.6 }}
+          className="bg-white/80 backdrop-blur-xl rounded-2xl p-6 shadow-lg border border-white/50"
         >
-          <div className="flex items-center justify-between mb-2">
-            <AlertTriangle className="w-8 h-8 text-yellow-500" />
-            <span className="text-2xl font-bold">{stats.medium_count || 0}</span>
+          <h2 className="text-xl font-semibold mb-4 text-gray-800">Recent Devices</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-left p-3 text-gray-600">Name</th>
+                  <th className="text-left p-3 text-gray-600">OS</th>
+                  <th className="text-left p-3 text-gray-600">Status</th>
+                  <th className="text-left p-3 text-gray-600">IP</th>
+                  <th className="text-left p-3 text-gray-600">Last Seen</th>
+                </tr>
+              </thead>
+              <tbody>
+                {devices.slice(0, 5).map(device => (
+                  <tr key={device.id} className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
+                    <td className="p-3">{device.name}</td>
+                    <td className="p-3">{device.os} {device.os_version}</td>
+                    <td className="p-3">
+                      <span className={`px-2 py-1 rounded-full text-xs ${
+                        device.status === 'online' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                      }`}>
+                        {device.status}
+                      </span>
+                    </td>
+                    <td className="p-3 text-sm text-gray-500">{new Date(device.last_seen).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          <p className="text-sm text-gray-600">Medium</p>
         </motion.div>
       </div>
-
-      {/* Charts Section */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.4 }}
-        className="bg-white/70 backdrop-blur-xl rounded-2xl p-6 shadow-[0_2px_12px_rgba(0,0,0,0.08)] border border-white/20 mb-8"
-      >
-        <p>Charts coming soon...</p>
-      </motion.div>
-
-      {/* Devices Table */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.5 }}
-        className="bg-white/70 backdrop-blur-xl rounded-2xl p-6 shadow-[0_2px_12px_rgba(0,0,0,0.08)] border border-white/20"
-      >
-        <h2 className="text-xl font-semibold mb-4">Recent Devices</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left p-3">Name</th>
-                <th className="text-left p-3">OS</th>
-                <th className="text-left p-3">Status</th>
-                <th className="text-left p-3">IP</th>
-                <th className="text-left p-3">Last Seen</th>
-              </tr>
-            </thead>
-            <tbody>
-              {devices.slice(0, 5).map(device => (
-                <tr key={device.id} className="border-b border-gray-100">
-                  <td className="p-3">{device.name}</td>
-                  <td className="p-3">{device.os} {device.os_version}</td>
-                  <td className="p-3">
-                    <span className={`px-2 py-1 rounded-full text-xs ${
-                      device.status === 'online' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                    }`>
-                      {device.status}
-                    </span>
-                  </td>
-                  <td className="p-3 text-sm text-gray-500">
-                    {new Date(device.last_seen).toLocaleString()}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </motion.div>
     </div>
   );
 }
