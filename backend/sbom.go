@@ -77,12 +77,11 @@ type CycloneDXDependency struct {
 
 // sbomHandler generates CycloneDX SBOM for a device
 func sbomHandler(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
 	deviceID := chi.URLParam(r, "id")
 
 	// Get device info
 	var device Device
-	err := db.QueryRow(ctx, `
+	err := db.QueryRow(`
 		SELECT id, device_id, hostname, os_type, os_version, os_build, architecture
 		FROM devices WHERE device_id = $1
 	`, deviceID).Scan(&device.ID, &device.DeviceID, &device.Hostname, 
@@ -94,7 +93,7 @@ func sbomHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get software for device
-	rows, err := db.Query(ctx, `
+	rows, err := db.Query(`
 		SELECT name, version, publisher, install_path, source, cpe, sha256_hash, first_seen, last_seen
 		FROM software
 		WHERE device_id = $1

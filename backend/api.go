@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -9,7 +10,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 )
 
 // API handles all HTTP routes
@@ -50,9 +50,7 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 
 // listDevicesHandler returns all devices
 func listDevicesHandler(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	rows, err := db.Query(ctx, `
+	rows, err := db.Query(`
 		SELECT id, device_id, hostname, os_type, os_version, last_seen, is_online, agent_version
 		FROM devices
 		ORDER BY last_seen DESC
@@ -88,11 +86,10 @@ func listDevicesHandler(w http.ResponseWriter, r *http.Request) {
 
 // getDeviceHandler returns a single device by ID
 func getDeviceHandler(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
 	id := chi.URLParam(r, "id")
 
 	var d Device
-	err := db.QueryRow(ctx, `
+	err := db.QueryRow(`
 		SELECT id, device_id, hostname, os_type, os_version, os_build, architecture,
 		       last_seen, first_seen, ip_address, mac_address, agent_version, is_online, metadata
 		FROM devices WHERE device_id = $1
@@ -110,18 +107,17 @@ func getDeviceHandler(w http.ResponseWriter, r *http.Request) {
 
 // getDeviceSoftwareHandler returns software for a device
 func getDeviceSoftwareHandler(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
 	id := chi.URLParam(r, "id")
 
 	// First get device UUID
 	var deviceUUID uuid.UUID
-	err := db.QueryRow(ctx, `SELECT id FROM devices WHERE device_id = $1`, id).Scan(&deviceUUID)
+	err := db.QueryRow(`SELECT id FROM devices WHERE device_id = $1`, id).Scan(&deviceUUID)
 	if err != nil {
 		render.JSON(w, r, APIResponse{Success: false, Error: "Device not found"})
 		return
 	}
 
-	rows, err := db.Query(ctx, `
+	rows, err := db.Query(`
 		SELECT name, version, publisher, install_path, source, first_seen, last_seen
 		FROM software
 		WHERE device_id = $1
@@ -149,8 +145,6 @@ func getDeviceSoftwareHandler(w http.ResponseWriter, r *http.Request) {
 
 // heartbeatHandler processes agent heartbeats
 func heartbeatHandler(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
 	var req HeartbeatRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		render.JSON(w, r, APIResponse{Success: false, Error: "Invalid JSON: " + err.Error()})
@@ -166,7 +160,7 @@ func heartbeatHandler(w http.ResponseWriter, r *http.Request) {
 	now := time.Now().UTC()
 
 	// Insert or update device
-	_, err := db.Exec(ctx, `
+	_, err := db.Exec(`
 		INSERT INTO devices (device_id, hostname, os_type, os_version, architecture, 
 		                     agent_version, last_seen, is_online, metadata)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, true, $8)
@@ -187,14 +181,14 @@ func heartbeatHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Get device UUID for heartbeat log
 	var deviceUUID uuid.UUID
-	err = db.QueryRow(ctx, `SELECT id FROM devices WHERE device_id = $1`, req.DeviceID).Scan(&deviceUUID)
+	err = db.QueryRow(`SELECT id FROM devices WHERE device_id = $1`, req.DeviceID).Scan(&deviceUUID)
 	if err != nil {
 		render.JSON(w, r, APIResponse{Success: false, Error: "Failed to get device ID"})
 		return
 	}
 
 	// Log heartbeat
-	_, err = db.Exec(ctx, `
+	_, err = db.Exec(`
 		INSERT INTO heartbeats (device_id, timestamp, uptime_seconds, cpu_usage_percent, memory_usage_mb, metadata)
 		VALUES ($1, $2, $3, $4, $5, $6)
 	`, deviceUUID, now, req.UptimeSeconds, req.CPUUsagePercent, req.MemoryUsageMB, req.Metadata)
@@ -229,17 +223,17 @@ func scanHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Execute in transaction
-	err := Transaction(ctx, func(tx pgx.Tx) error {
+	err := Transaction(ctx, func(tx *sql.Tx) error {
 		// Get device UUID
 		var deviceUUID uuid.UUID
-		err := tx.QueryRow(ctx, `SELECT id FROM devices WHERE device_id = $1`, result.DeviceID).Scan(&deviceUUID)
+		err := tx.QueryRow(`SELECT id FROM devices WHERE device_id = $1`, result.DeviceID).Scan(&deviceUUID)
 		if err != nil {
 			return err
 		}
 
 		// Create scan record
 		scanID := uuid.New()
-		_, err = tx.Exec(ctx, `
+		_, err = tx.Exec(`
 			INSERT INTO scans (id, device_id, scan_type, software_count, process_count, status)
 			VALUES ($1, $2, $3, $4, $5, 'completed')
 		`, scanID, deviceUUID, result.ScanType, len(result.Software), len(result.Processes))
@@ -249,7 +243,7 @@ func scanHandler(w http.ResponseWriter, r *http.Request) {
 
 		// Insert or update software entries
 		for _, sw := range result.Software {
-			_, err = tx.Exec(ctx, `
+			_, err = tx.Exec(`
 				INSERT INTO software (device_id, name, version, publisher, install_path, source, last_seen)
 				VALUES ($1, $2, $3, $4, $5, $6, NOW())
 				ON CONFLICT (device_id, name, version, source) DO UPDATE SET
@@ -263,7 +257,7 @@ func scanHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Update device last_seen
-		_, err = tx.Exec(ctx, `
+		_, err = tx.Exec(`
 			UPDATE devices SET last_seen = NOW(), updated_at = NOW() WHERE id = $1
 		`, deviceUUID)
 		if err != nil {
@@ -291,8 +285,6 @@ func scanHandler(w http.ResponseWriter, r *http.Request) {
 
 // listVulnerabilitiesHandler returns all CVEs with optional filters
 func listVulnerabilitiesHandler(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
 	severity := r.URL.Query().Get("severity")
 	limit := 100
 	if l := r.URL.Query().Get("limit"); l != "" {
@@ -316,7 +308,7 @@ func listVulnerabilitiesHandler(w http.ResponseWriter, r *http.Request) {
 	query += ` ORDER BY cvss_score DESC NULLS LAST LIMIT $` + strconv.Itoa(len(params)+1)
 	params = append(params, limit)
 
-	rows, err := db.Query(ctx, query, params...)
+	rows, err := db.Query(query, params...)
 	if err != nil {
 		render.JSON(w, r, APIResponse{Success: false, Error: err.Error()})
 		return
@@ -349,7 +341,6 @@ func listVulnerabilitiesHandler(w http.ResponseWriter, r *http.Request) {
 
 // getCVEHandler returns a single CVE by ID
 func getCVEHandler(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
 	cveID := chi.URLParam(r, "cve_id")
 
 	var cveIDStr, desc, severity string
@@ -360,7 +351,7 @@ func getCVEHandler(w http.ResponseWriter, r *http.Request) {
 	var cweIDs []string
 	var refsJSON []byte
 
-	err := db.QueryRow(ctx, `
+	err := db.QueryRow(`
 		SELECT cve_id, description, cvss_score, cvss_vector, severity,
 		       published_date, last_modified, epss_score, cwe_ids, "references"
 		FROM cves WHERE cve_id = $1
@@ -392,9 +383,7 @@ func getCVEHandler(w http.ResponseWriter, r *http.Request) {
 
 // vulnerabilityStatsHandler returns vulnerability statistics
 func vulnerabilityStatsHandler(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	stats, err := GetCVEStats(ctx, db)
+	stats, err := GetCVEStats(db)
 	if err != nil {
 		render.JSON(w, r, APIResponse{Success: false, Error: err.Error()})
 		return
@@ -405,19 +394,18 @@ func vulnerabilityStatsHandler(w http.ResponseWriter, r *http.Request) {
 
 // getDeviceVulnerabilitiesHandler returns vulnerabilities for a device
 func getDeviceVulnerabilitiesHandler(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
 	deviceID := chi.URLParam(r, "id")
 
 	// Get device UUID
 	var deviceUUID uuid.UUID
-	err := db.QueryRow(ctx, `SELECT id FROM devices WHERE device_id = $1`, deviceID).Scan(&deviceUUID)
+	err := db.QueryRow(`SELECT id FROM devices WHERE device_id = $1`, deviceID).Scan(&deviceUUID)
 	if err != nil {
 		render.JSON(w, r, APIResponse{Success: false, Error: "Device not found"})
 		return
 	}
 
 	// Get vulnerabilities with software details
-	rows, err := db.Query(ctx, `
+	rows, err := db.Query(`
 		SELECT sv.id, c.cve_id, c.description, c.cvss_score, c.severity,
 		       sv.risk_score, sv.status, s.name as software_name, s.version as software_version
 		FROM software_vulnerabilities sv

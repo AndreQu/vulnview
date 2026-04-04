@@ -2,112 +2,83 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"os"
-	"path/filepath"
-	"time"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
+	_ "github.com/mattn/go-sqlite3"
 )
 
-var db *pgxpool.Pool
+var db *sql.DB
 
-// InitDB initializes the database connection pool
 func InitDB() error {
-	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
-		getEnv("DB_USER", "vulnview"),
-		getEnv("DB_PASSWORD", "vulnview"),
-		getEnv("DB_HOST", "localhost"),
-		getEnv("DB_PORT", "5432"),
-		getEnv("DB_NAME", "vulnview"),
-	)
-
-	config, err := pgxpool.ParseConfig(dsn)
+	var err error
+	dbPath := getEnv("DB_PATH", "./vulnview.db")
+	db, err = sql.Open("sqlite3", dbPath)
 	if err != nil {
-		return fmt.Errorf("failed to parse database config: %w", err)
+		return fmt.Errorf("failed to open database: %w", err)
 	}
 
-	config.MaxConns = 25
-	config.MinConns = 5
-	config.MaxConnLifetime = time.Hour
-	config.MaxConnIdleTime = time.Minute * 30
-
-	db, err = pgxpool.NewWithConfig(context.Background(), config)
-	if err != nil {
-		return fmt.Errorf("failed to create connection pool: %w", err)
-	}
-
-	// Test connection
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	if err := db.Ping(ctx); err != nil {
+	if err := db.Ping(); err != nil {
 		return fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	if err := InitSchema(ctx); err != nil {
-		return fmt.Errorf("failed to initialize schema: %w", err)
-	}
-
-	return nil
-}
-
-// InitSchema executes the SQL schema file to ensure required tables exist.
-func InitSchema(ctx context.Context) error {
-	schemaPath := getEnv("DB_INIT_SQL", "init.sql")
-	content, err := os.ReadFile(schemaPath)
+	// Create tables
+	schema := `
+	CREATE TABLE IF NOT EXISTS devices (
+		id TEXT PRIMARY KEY,
+		name TEXT,
+		os TEXT,
+		os_version TEXT,
+		last_seen DATETIME,
+		ip_address TEXT,
+		status TEXT
+	);
+	CREATE TABLE IF NOT EXISTS software (
+		id TEXT PRIMARY KEY,
+		device_id TEXT,
+		name TEXT,
+		version TEXT,
+		vendor TEXT,
+		install_date DATETIME
+	);
+	`
+	_, err = db.Exec(schema)
 	if err != nil {
-		// Fallback to the executable directory so deployments still work
-		// when started from a different cwd.
-		execPath, pathErr := os.Executable()
-		if pathErr == nil {
-			altPath := filepath.Join(filepath.Dir(execPath), "init.sql")
-			content, err = os.ReadFile(altPath)
-		}
-		if err != nil {
-			return fmt.Errorf("failed to read schema file %q: %w", schemaPath, err)
-		}
+		return fmt.Errorf("failed to create schema: %w", err)
 	}
 
-	if _, err := db.Exec(ctx, string(content)); err != nil {
-		return fmt.Errorf("failed to execute schema: %w", err)
-	}
-
+	fmt.Println("Database initialized (SQLite)")
 	return nil
 }
 
-// CloseDB closes the database connection pool
 func CloseDB() {
 	if db != nil {
-		db.Close()
+		_ = db.Close()
 	}
 }
 
-// getEnv returns environment variable or default value
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
-
-// GetDB returns the database pool
-func GetDB() *pgxpool.Pool {
+func GetDB() *sql.DB {
 	return db
 }
 
-// Transaction executes a function within a database transaction
-func Transaction(ctx context.Context, fn func(pgx.Tx) error) error {
-	tx, err := db.Begin(ctx)
+func Transaction(ctx context.Context, fn func(*sql.Tx) error) error {
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 
 	if err := fn(tx); err != nil {
-		tx.Rollback(ctx)
+		_ = tx.Rollback()
 		return err
 	}
 
-	return tx.Commit(ctx)
+	return tx.Commit()
+}
+
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,7 +12,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 )
 
 const (
@@ -207,9 +207,7 @@ func (c *NVDClient) FetchAllCVEs(ctx context.Context, maxResults int) ([]NVDVuln
 }
 
 // StoreCVEs stores CVEs in the database
-func StoreCVEs(ctx context.Context, db *pgx.Conn, items []NVDVulnItem) error {
-	batch := &pgx.Batch{}
-
+func StoreCVEs(ctx context.Context, db *sql.DB, items []NVDVulnItem) error {
 	for _, item := range items {
 		cve := item.CVE
 
@@ -273,40 +271,35 @@ func StoreCVEs(ctx context.Context, db *pgx.Conn, items []NVDVulnItem) error {
 		}
 		productsJSON, _ := json.Marshal(affectedProducts)
 
-		batch.Queue(`
-				INSERT INTO cves (
-					cve_id, description, cvss_score, cvss_vector, severity,
-					published_date, last_modified, cwe_ids, "references", affected_products
-				) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-				ON CONFLICT (cve_id) DO UPDATE SET
-					description = EXCLUDED.description,
+		_, err := db.ExecContext(ctx, `
+			INSERT INTO cves (
+				cve_id, description, cvss_score, cvss_vector, severity,
+				published_date, last_modified, cwe_ids, "references", affected_products
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+			ON CONFLICT (cve_id) DO UPDATE SET
+				description = EXCLUDED.description,
 				cvss_score = EXCLUDED.cvss_score,
 				cvss_vector = EXCLUDED.cvss_vector,
 				severity = EXCLUDED.severity,
 				last_modified = EXCLUDED.last_modified,
-					cwe_ids = EXCLUDED.cwe_ids,
-					"references" = EXCLUDED."references",
-					affected_products = EXCLUDED.affected_products,
-					updated_at = NOW()
-			`,
+				cwe_ids = EXCLUDED.cwe_ids,
+				"references" = EXCLUDED."references",
+				affected_products = EXCLUDED.affected_products,
+				updated_at = CURRENT_TIMESTAMP
+		`,
 			cve.ID, description, cvssScore, cvssVector, severity,
 			published, lastModified, cweIDs, refsJSON, productsJSON,
 		)
-	}
-
-	results := db.SendBatch(ctx, batch)
-	defer results.Close()
-
-	_, err := results.Exec()
-	if err != nil {
-		return fmt.Errorf("executing batch: %w", err)
+		if err != nil {
+			return fmt.Errorf("upserting cve %s: %w", cve.ID, err)
+		}
 	}
 
 	return nil
 }
 
 // SyncCVESyncLog logs a sync operation
-func SyncCVESyncLog(ctx context.Context, db *pgx.Conn, syncType string, cvesAdded, cvesUpdated int, duration time.Duration, err error) error {
+func SyncCVESyncLog(ctx context.Context, db *sql.DB, syncType string, cvesAdded, cvesUpdated int, duration time.Duration, err error) error {
 	status := "completed"
 	errMsg := ""
 	if err != nil {
@@ -314,7 +307,7 @@ func SyncCVESyncLog(ctx context.Context, db *pgx.Conn, syncType string, cvesAdde
 		errMsg = err.Error()
 	}
 
-	_, dbErr := db.Exec(ctx, `
+	_, dbErr := db.ExecContext(ctx, `
 		INSERT INTO nvd_sync_log (sync_type, status, cves_added, cves_updated, api_response_time_ms, error_message)
 		VALUES ($1, $2, $3, $4, $5, $6)
 	`, syncType, status, cvesAdded, cvesUpdated, int(duration.Milliseconds()), errMsg)
@@ -323,17 +316,17 @@ func SyncCVESyncLog(ctx context.Context, db *pgx.Conn, syncType string, cvesAdde
 }
 
 // GetCVEStats returns statistics about CVEs
-func GetCVEStats(ctx context.Context, db interface {
-	QueryRow(context.Context, string, ...interface{}) pgx.Row
+func GetCVEStats(db interface {
+	QueryRow(string, ...interface{}) *sql.Row
 }) (map[string]interface{}, error) {
 	var total, critical, high, medium, low int
-	err := db.QueryRow(ctx, `
+	err := db.QueryRow(`
 		SELECT 
 			COUNT(*),
-			COUNT(*) FILTER (WHERE severity = 'CRITICAL'),
-			COUNT(*) FILTER (WHERE severity = 'HIGH'),
-			COUNT(*) FILTER (WHERE severity = 'MEDIUM'),
-			COUNT(*) FILTER (WHERE severity = 'LOW')
+			SUM(CASE WHEN severity = 'CRITICAL' THEN 1 ELSE 0 END),
+			SUM(CASE WHEN severity = 'HIGH' THEN 1 ELSE 0 END),
+			SUM(CASE WHEN severity = 'MEDIUM' THEN 1 ELSE 0 END),
+			SUM(CASE WHEN severity = 'LOW' THEN 1 ELSE 0 END)
 		FROM cves
 	`).Scan(&total, &critical, &high, &medium, &low)
 
@@ -351,17 +344,17 @@ func GetCVEStats(ctx context.Context, db interface {
 }
 
 // MatchSoftwareToCVEs attempts to match software against CVE CPEs
-func MatchSoftwareToCVEs(ctx context.Context, db *pgx.Conn, softwareID uuid.UUID, softwareName, softwareVersion string) error {
+func MatchSoftwareToCVEs(ctx context.Context, db *sql.DB, softwareID uuid.UUID, softwareName, softwareVersion string) error {
 	// This is a simplified matching - in production you'd use proper CPE matching
 	// with version range comparison
 
 	// Get CVEs that might match this software
-	rows, err := db.Query(ctx, `
+	rows, err := db.QueryContext(ctx, `
 		SELECT id FROM cves 
-		WHERE affected_products @> $1::jsonb
-		   OR description ILIKE $2
+		WHERE affected_products LIKE $1
+		   OR description LIKE $2
 	`,
-		fmt.Sprintf(`[{"criteria": "%%%s%%"}]`, softwareName),
+		"%"+softwareName+"%",
 		"%"+softwareName+"%",
 	)
 	if err != nil {
@@ -377,7 +370,7 @@ func MatchSoftwareToCVEs(ctx context.Context, db *pgx.Conn, softwareID uuid.UUID
 
 		// Check if match already exists
 		var exists bool
-		err := db.QueryRow(ctx, `
+		err := db.QueryRowContext(ctx, `
 			SELECT EXISTS(SELECT 1 FROM software_vulnerabilities WHERE software_id = $1 AND cve_id = $2)
 		`, softwareID, cveID).Scan(&exists)
 		if err != nil || exists {
@@ -387,7 +380,7 @@ func MatchSoftwareToCVEs(ctx context.Context, db *pgx.Conn, softwareID uuid.UUID
 		// Get CVE details for risk calculation
 		var cvssScore float64
 		var epssScore float64
-		err = db.QueryRow(ctx, `
+		err = db.QueryRowContext(ctx, `
 			SELECT COALESCE(cvss_score, 0), COALESCE(epss_score, 0) FROM cves WHERE id = $1
 		`, cveID).Scan(&cvssScore, &epssScore)
 		if err != nil {
@@ -398,7 +391,7 @@ func MatchSoftwareToCVEs(ctx context.Context, db *pgx.Conn, softwareID uuid.UUID
 		riskScore := cvssScore * 10 * epssScore
 
 		// Insert match
-		_, err = db.Exec(ctx, `
+		_, err = db.ExecContext(ctx, `
 			INSERT INTO software_vulnerabilities (software_id, cve_id, matched_version, match_confidence, risk_score)
 			VALUES ($1, $2, $3, $4, $5)
 		`, softwareID, cveID, softwareVersion, 0.7, riskScore)
