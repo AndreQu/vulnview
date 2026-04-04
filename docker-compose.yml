@@ -1,32 +1,11 @@
 version: '3.8'
 
 services:
-  postgres:
-    image: postgres:15-alpine
-    container_name: vulnview-db
-    environment:
-      POSTGRES_USER: vulnview
-      POSTGRES_PASSWORD: vulnview
-      POSTGRES_DB: vulnview
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    restart: unless-stopped
-    # KEIN ports:-Mapping! Nur intern erreichbar
-
   backend:
     build: ./backend
     container_name: vulnview-backend
     ports:
       - "8443:8443"
-    environment:
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: vulnview
-      DB_PASSWORD: vulnview
-      DB_NAME: vulnview
-    depends_on:
-      - postgres
+    volumes:
+      - ./data:/root/data
     restart: unless-stopped
-
-volumes:
-  postgres_data:
