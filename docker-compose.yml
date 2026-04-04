@@ -13,8 +13,6 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     privileged: true
-    sysctls:
-      - net.ipv4.ip_unprivileged_port_start=1024
     restart: unless-stopped
 
   backend:
