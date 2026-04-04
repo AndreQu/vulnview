@@ -5,7 +5,7 @@ services:
     build: ./backend
     container_name: vulnview-backend
     ports:
-      - "8443:8443"
+      - "18443:18443"
     volumes:
       - ./data:/root/data
     restart: unless-stopped

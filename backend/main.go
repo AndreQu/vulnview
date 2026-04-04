@@ -74,7 +74,7 @@ func main() {
 	}
 
 	// Create server
-	port := getEnv("PORT", "8443")
+	port := getEnv("PORT", "18443")
 	server := &http.Server{
 		Addr:         ":" + port,
 		Handler:      r,

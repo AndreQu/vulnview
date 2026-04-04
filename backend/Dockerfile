@@ -17,6 +17,6 @@ COPY --from=builder /app/vulnview-backend .
 VOLUME ["/root/data"]
 ENV DB_PATH=/root/data/vulnview.db
 
-EXPOSE 8443
+EXPOSE 18443
 
 CMD ["./vulnview-backend"]
