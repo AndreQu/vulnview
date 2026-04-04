@@ -64,20 +64,20 @@ export function DeviceTable() {
         <h3 className="text-lg font-semibold">Devices</h3>
         <div className="flex flex-col gap-2 md:flex-row">
           <label className="relative">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-apple-gray-400" />
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Suche Name oder IP"
-              className="rounded-xl border border-apple-gray-200 bg-white/80 py-2 pl-9 pr-3 text-sm outline-none transition focus:border-apple-blue dark:border-apple-gray-700 dark:bg-apple-gray-800/80"
+              placeholder="Search by name or IP"
+              className="glass-input py-2 pl-9 pr-3"
             />
           </label>
           <select
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.target.value as 'all' | Device['status'])}
-            className="rounded-xl border border-apple-gray-200 bg-white/80 px-3 py-2 text-sm outline-none transition focus:border-apple-blue dark:border-apple-gray-700 dark:bg-apple-gray-800/80"
+            className="glass-input px-3 py-2"
           >
-            <option value="all">Alle</option>
+            <option value="all">All</option>
             <option value="online">Online</option>
             <option value="warning">Warning</option>
             <option value="offline">Offline</option>
@@ -88,7 +88,7 @@ export function DeviceTable() {
       <div className="mt-4 overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead>
-            <tr className="border-b border-apple-gray-200/70 text-apple-gray-500 dark:border-apple-gray-700 dark:text-apple-gray-300">
+            <tr className="border-b border-slate-300/70 text-slate-500 dark:border-slate-700 dark:text-slate-400">
               <th className="pb-2">Name</th>
               <th className="pb-2">IP</th>
               <th className="pb-2">OS</th>
@@ -100,7 +100,7 @@ export function DeviceTable() {
           </thead>
           <tbody>
             {filtered.map((device) => (
-              <tr key={device.id} className="border-b border-apple-gray-100/80 text-apple-gray-700 dark:border-apple-gray-700/70 dark:text-apple-gray-100">
+              <tr key={device.id} className="border-b border-slate-200/80 text-slate-700 dark:border-slate-800 dark:text-slate-100">
                 <td className="py-3 font-medium">{device.name}</td>
                 <td className="py-3">{device.ip}</td>
                 <td className="py-3">{device.os}</td>
@@ -108,10 +108,10 @@ export function DeviceTable() {
                   <span
                     className={
                       device.status === 'online'
-                        ? 'rounded-full bg-apple-green/15 px-2 py-1 text-apple-green'
+                        ? 'rounded-full bg-emerald-500/15 px-2 py-1 text-emerald-500'
                         : device.status === 'warning'
-                          ? 'rounded-full bg-apple-orange/15 px-2 py-1 text-apple-orange'
-                          : 'rounded-full bg-apple-red/15 px-2 py-1 text-apple-red'
+                          ? 'rounded-full bg-amber-500/15 px-2 py-1 text-amber-500'
+                          : 'rounded-full bg-rose-500/15 px-2 py-1 text-rose-500'
                     }
                   >
                     {device.status}

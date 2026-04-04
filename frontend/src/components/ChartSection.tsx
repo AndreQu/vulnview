@@ -1,9 +1,9 @@
 import {
   Area,
   AreaChart,
+  Bar,
+  BarChart,
   CartesianGrid,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -12,20 +12,20 @@ import {
 import { GlassCard } from './GlassCard';
 
 const trendData = [
-  { day: 'Mo', cves: 22 },
-  { day: 'Di', cves: 19 },
-  { day: 'Mi', cves: 24 },
-  { day: 'Do', cves: 17 },
-  { day: 'Fr', cves: 13 },
-  { day: 'Sa', cves: 16 },
-  { day: 'So', cves: 12 },
+  { day: 'Mon', cves: 31, patched: 18 },
+  { day: 'Tue', cves: 29, patched: 20 },
+  { day: 'Wed', cves: 34, patched: 25 },
+  { day: 'Thu', cves: 26, patched: 19 },
+  { day: 'Fri', cves: 24, patched: 17 },
+  { day: 'Sat', cves: 22, patched: 15 },
+  { day: 'Sun', cves: 19, patched: 14 },
 ];
 
-const riskData = [
-  { name: 'Critical', value: 9, fill: '#FF3B30' },
-  { name: 'High', value: 21, fill: '#FF9500' },
-  { name: 'Medium', value: 37, fill: '#FFCC00' },
-  { name: 'Low', value: 54, fill: '#34C759' },
+const severityData = [
+  { level: 'Critical', total: 8 },
+  { level: 'High', total: 22 },
+  { level: 'Medium', total: 39 },
+  { level: 'Low', total: 51 },
 ];
 
 export function ChartSection() {
@@ -33,21 +33,21 @@ export function ChartSection() {
     <div className="grid gap-6 lg:grid-cols-3">
       <div className="lg:col-span-2">
         <GlassCard>
-          <h3 className="text-lg font-semibold">CVE Verlauf (7 Tage)</h3>
+          <h3 className="text-lg font-semibold">CVE Trend (7 Days)</h3>
           <div className="mt-4 h-72">
             <ResponsiveContainer>
               <AreaChart data={trendData}>
                 <defs>
                   <linearGradient id="cveGradient" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="5%" stopColor="#007AFF" stopOpacity={0.45} />
-                    <stop offset="95%" stopColor="#007AFF" stopOpacity={0.02} />
+                    <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0.05} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#D1D1D6" opacity={0.3} />
-                <XAxis dataKey="day" stroke="#8E8E93" />
-                <YAxis stroke="#8E8E93" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#94a3b8" opacity={0.2} />
+                <XAxis dataKey="day" stroke="#64748b" />
+                <YAxis stroke="#64748b" />
                 <Tooltip />
-                <Area type="monotone" dataKey="cves" stroke="#007AFF" fill="url(#cveGradient)" strokeWidth={3} />
+                <Area type="monotone" dataKey="cves" stroke="#0ea5e9" fill="url(#cveGradient)" strokeWidth={3} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -55,13 +55,16 @@ export function ChartSection() {
       </div>
 
       <GlassCard>
-        <h3 className="text-lg font-semibold">Risk Score</h3>
+        <h3 className="text-lg font-semibold">Severity Mix</h3>
         <div className="mt-4 h-72">
           <ResponsiveContainer>
-            <PieChart>
-              <Pie data={riskData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={3} />
+            <BarChart data={severityData} layout="vertical" margin={{ left: 4, right: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#94a3b8" opacity={0.15} />
+              <XAxis type="number" stroke="#64748b" />
+              <YAxis dataKey="level" type="category" stroke="#64748b" width={55} />
               <Tooltip />
-            </PieChart>
+              <Bar dataKey="total" radius={8} fill="#38bdf8" />
+            </BarChart>
           </ResponsiveContainer>
         </div>
       </GlassCard>

@@ -3,7 +3,6 @@ import { Layout } from './components/Layout';
 import { CVEs } from './pages/CVEs';
 import { Dashboard } from './pages/Dashboard';
 import { Devices } from './pages/Devices';
-import { Reports } from './pages/Reports';
 
 function App() {
   return (
@@ -12,7 +11,6 @@ function App() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/devices" element={<Devices />} />
         <Route path="/cves" element={<CVEs />} />
-        <Route path="/reports" element={<Reports />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

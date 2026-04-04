@@ -53,9 +53,9 @@ export function CVETable() {
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setFilter('all')}
-            className={`rounded-full px-3 py-1.5 text-sm transition ${filter === 'all' ? 'bg-apple-blue text-white shadow-glow' : 'bg-white/70 text-apple-gray-600 dark:bg-apple-gray-700 dark:text-apple-gray-200'}`}
+            className={`rounded-full px-3 py-1.5 text-sm transition ${filter === 'all' ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900' : 'bg-white/70 text-slate-600 dark:bg-slate-800/90 dark:text-slate-300'}`}
           >
-            Alle
+            All
           </button>
           {labels.map((severity) => (
             <button
@@ -63,8 +63,8 @@ export function CVETable() {
               onClick={() => setFilter(severity)}
               className={`rounded-full px-3 py-1.5 text-sm capitalize transition ${
                 filter === severity
-                  ? 'bg-apple-blue text-white shadow-glow'
-                  : 'bg-white/70 text-apple-gray-600 dark:bg-apple-gray-700 dark:text-apple-gray-200'
+                  ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+                  : 'bg-white/70 text-slate-600 dark:bg-slate-800/90 dark:text-slate-300'
               }`}
             >
               {severity}
@@ -76,40 +76,39 @@ export function CVETable() {
       <div className="mt-4 overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead>
-            <tr className="border-b border-apple-gray-200/70 text-apple-gray-500 dark:border-apple-gray-700 dark:text-apple-gray-300">
+            <tr className="border-b border-slate-300/70 text-slate-500 dark:border-slate-700 dark:text-slate-400">
               <th className="pb-2">CVE</th>
-              <th className="pb-2">Titel</th>
+              <th className="pb-2">Title</th>
               <th className="pb-2">Severity</th>
               <th className="pb-2">CVSS</th>
               <th className="pb-2">EPSS</th>
-              <th className="pb-2">Veröffentlicht</th>
+              <th className="pb-2">Published</th>
             </tr>
           </thead>
           <tbody>
-            {filtered.map((item) => (
-              <tr key={item.id} className="border-b border-apple-gray-100/80 dark:border-apple-gray-700/70">
+            {filtered.map((item) => {
+              const badgeStyle =
+                item.severity === 'critical'
+                  ? 'rounded-full bg-rose-500/15 px-2 py-1 text-rose-500'
+                  : item.severity === 'high'
+                    ? 'rounded-full bg-amber-500/15 px-2 py-1 text-amber-500'
+                    : item.severity === 'medium'
+                      ? 'rounded-full bg-yellow-500/15 px-2 py-1 text-yellow-600 dark:text-yellow-400'
+                      : 'rounded-full bg-emerald-500/15 px-2 py-1 text-emerald-500';
+
+              return (
+              <tr key={item.id} className="border-b border-slate-200/80 dark:border-slate-800">
                 <td className="py-3 font-medium">{item.id}</td>
                 <td className="py-3">{item.title}</td>
                 <td className="py-3">
-                  <span
-                    className={
-                      item.severity === 'critical'
-                        ? 'rounded-full bg-apple-red/15 px-2 py-1 text-apple-red'
-                        : item.severity === 'high'
-                          ? 'rounded-full bg-apple-orange/15 px-2 py-1 text-apple-orange'
-                          : item.severity === 'medium'
-                            ? 'rounded-full bg-apple-yellow/20 px-2 py-1 text-yellow-700 dark:text-apple-yellow'
-                            : 'rounded-full bg-apple-green/15 px-2 py-1 text-apple-green'
-                    }
-                  >
-                    {item.severity}
-                  </span>
+                  <span className={badgeStyle}>{item.severity}</span>
                 </td>
                 <td className="py-3">{item.cvss.toFixed(1)}</td>
                 <td className="py-3">{(item.epss * 100).toFixed(0)}%</td>
                 <td className="py-3">{item.publishedAt}</td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

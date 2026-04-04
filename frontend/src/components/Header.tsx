@@ -7,22 +7,22 @@ type HeaderProps = {
 
 export function Header({ darkMode, onToggleTheme }: HeaderProps) {
   return (
-    <header className="mb-6 flex items-center justify-between rounded-apple border border-white/40 bg-white/60 px-5 py-4 shadow-apple backdrop-blur-glass dark:border-white/10 dark:bg-apple-gray-800/60">
+    <header className="glass-card flex items-center justify-between px-5 py-4">
       <div>
-        <h1 className="text-xl font-semibold tracking-tight">Security Operations Dashboard</h1>
-        <p className="text-sm text-apple-gray-500 dark:text-apple-gray-300">Live posture und aktuelle Schwachstellenlage</p>
+        <h1 className="text-xl font-semibold tracking-tight">Security Dashboard</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Live posture for assets and vulnerabilities</p>
       </div>
 
       <div className="flex items-center gap-2">
         <button
           onClick={onToggleTheme}
-          className="rounded-xl border border-apple-gray-200 bg-white/80 p-2 transition hover:shadow-apple dark:border-apple-gray-700 dark:bg-apple-gray-800"
+          className="glass-button"
           aria-label="Theme wechseln"
         >
           {darkMode ? <Sun size={18} /> : <Moon size={18} />}
         </button>
         <button
-          className="rounded-xl border border-apple-gray-200 bg-white/80 p-2 transition hover:shadow-apple dark:border-apple-gray-700 dark:bg-apple-gray-800"
+          className="glass-button hidden sm:inline-flex"
           aria-label="Benachrichtigungen"
         >
           <Bell size={18} />

@@ -7,7 +7,13 @@ import { Sidebar } from './Sidebar';
 export function Layout() {
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     const saved = localStorage.getItem('vulnview-theme');
-    return saved === 'dark';
+    if (saved === 'light') {
+      return false;
+    }
+    if (saved === 'dark') {
+      return true;
+    }
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
 
   useEffect(() => {
@@ -16,20 +22,19 @@ export function Layout() {
   }, [darkMode]);
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_right,rgba(0,122,255,0.18),transparent_35%),radial-gradient(circle_at_bottom_left,rgba(175,82,222,0.16),transparent_35%)] px-4 py-6 text-apple-gray-900 dark:text-apple-gray-50 sm:px-6">
-      <div className="mx-auto flex max-w-7xl gap-6">
+    <div className="bg-canvas min-h-screen text-slate-900 transition-colors dark:text-slate-100">
+      <div className="mx-auto flex max-w-7xl gap-4 px-4 py-5 sm:px-6 lg:px-8">
         <Sidebar />
-
-        <main className="w-full">
+        <div className="w-full space-y-4">
           <Header darkMode={darkMode} onToggleTheme={() => setDarkMode((prev) => !prev)} />
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35 }}
+            transition={{ duration: 0.35, ease: 'easeOut' }}
           >
             <Outlet />
           </motion.div>
-        </main>
+        </div>
       </div>
     </div>
   );
