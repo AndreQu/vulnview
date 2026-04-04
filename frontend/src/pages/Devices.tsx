@@ -1,7 +1,20 @@
+import { useEffect } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { DeviceTable } from '../components/DeviceTable';
 import { GlassCard } from '../components/GlassCard';
+import { useDevicesApi } from '../hooks/useVulnApi';
+import type { LayoutOutletContext } from '../types';
 
 export function Devices() {
+  const { globalQuery, pushToast } = useOutletContext<LayoutOutletContext>();
+  const devicesApi = useDevicesApi();
+
+  useEffect(() => {
+    if (devicesApi.error) {
+      pushToast(`Devices API failed: ${devicesApi.error}`);
+    }
+  }, [devicesApi.error, pushToast]);
+
   return (
     <div className="space-y-4 pb-20 md:pb-0">
       <GlassCard>
@@ -10,7 +23,13 @@ export function Devices() {
           Track endpoint health, filter by status and inspect exposure per device.
         </p>
       </GlassCard>
-      <DeviceTable />
+      <DeviceTable
+        devices={devicesApi.data}
+        loading={devicesApi.loading}
+        error={devicesApi.error}
+        onRetry={devicesApi.retry}
+        globalQuery={globalQuery}
+      />
     </div>
   );
 }

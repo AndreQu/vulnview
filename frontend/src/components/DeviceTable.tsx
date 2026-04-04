@@ -3,60 +3,31 @@ import { Search } from 'lucide-react';
 import type { Device } from '../types';
 import { GlassCard } from './GlassCard';
 
-const devices: Device[] = [
-  {
-    id: 'dev-001',
-    name: 'MacBook-Pro-001',
-    ip: '10.0.0.14',
-    os: 'macOS 14.7',
-    status: 'online',
-    riskScore: 28,
-    openCVEs: 3,
-    lastSeen: 'vor 2 min',
-  },
-  {
-    id: 'dev-002',
-    name: 'Ubuntu-Server-API',
-    ip: '10.0.1.20',
-    os: 'Ubuntu 24.04',
-    status: 'warning',
-    riskScore: 71,
-    openCVEs: 14,
-    lastSeen: 'vor 30 sek',
-  },
-  {
-    id: 'dev-003',
-    name: 'Windows-Workstation-9',
-    ip: '10.0.4.12',
-    os: 'Windows 11',
-    status: 'offline',
-    riskScore: 45,
-    openCVEs: 7,
-    lastSeen: 'vor 1 h',
-  },
-  {
-    id: 'dev-004',
-    name: 'K8s-Node-Edge',
-    ip: '10.0.8.55',
-    os: 'Debian 12',
-    status: 'online',
-    riskScore: 36,
-    openCVEs: 5,
-    lastSeen: 'gerade eben',
-  },
-];
+type DeviceTableProps = {
+  devices: Device[];
+  loading: boolean;
+  error: string | null;
+  onRetry: () => void;
+  globalQuery?: string;
+};
 
-export function DeviceTable() {
+export function DeviceTable({ devices, loading, error, onRetry, globalQuery = '' }: DeviceTableProps) {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | Device['status']>('all');
 
   const filtered = useMemo(() => {
+    const normalizedGlobalQuery = globalQuery.trim().toLowerCase();
     return devices.filter((device) => {
       const matchesSearch = device.name.toLowerCase().includes(query.toLowerCase()) || device.ip.includes(query);
+      const matchesGlobal =
+        normalizedGlobalQuery.length === 0 ||
+        device.name.toLowerCase().includes(normalizedGlobalQuery) ||
+        device.ip.toLowerCase().includes(normalizedGlobalQuery) ||
+        device.os.toLowerCase().includes(normalizedGlobalQuery);
       const matchesFilter = statusFilter === 'all' || device.status === statusFilter;
-      return matchesSearch && matchesFilter;
+      return matchesSearch && matchesFilter && matchesGlobal;
     });
-  }, [query, statusFilter]);
+  }, [devices, globalQuery, query, statusFilter]);
 
   return (
     <GlassCard>
@@ -85,6 +56,15 @@ export function DeviceTable() {
         </div>
       </div>
 
+      {error ? (
+        <div className="mt-4 rounded-xl border border-rose-400/40 bg-rose-100/60 p-4 dark:bg-rose-900/15">
+          <p className="text-sm text-rose-700 dark:text-rose-300">API error: {error}</p>
+          <button onClick={onRetry} className="mt-3 rounded-lg bg-rose-500 px-3 py-1.5 text-sm text-white transition hover:bg-rose-600">
+            Retry
+          </button>
+        </div>
+      ) : null}
+
       <div className="mt-4 overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead>
@@ -99,29 +79,41 @@ export function DeviceTable() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((device) => (
-              <tr key={device.id} className="border-b border-slate-200/80 text-slate-700 dark:border-slate-800 dark:text-slate-100">
-                <td className="py-3 font-medium">{device.name}</td>
-                <td className="py-3">{device.ip}</td>
-                <td className="py-3">{device.os}</td>
-                <td className="py-3">
-                  <span
-                    className={
-                      device.status === 'online'
-                        ? 'rounded-full bg-emerald-500/15 px-2 py-1 text-emerald-500'
-                        : device.status === 'warning'
-                          ? 'rounded-full bg-amber-500/15 px-2 py-1 text-amber-500'
-                          : 'rounded-full bg-rose-500/15 px-2 py-1 text-rose-500'
-                    }
-                  >
-                    {device.status}
-                  </span>
-                </td>
-                <td className="py-3">{device.riskScore}</td>
-                <td className="py-3">{device.openCVEs}</td>
-                <td className="py-3">{device.lastSeen}</td>
-              </tr>
-            ))}
+            {loading
+              ? Array.from({ length: 5 }).map((_, index) => (
+                  <tr key={`device-skeleton-${index}`} className="border-b border-slate-200/80 dark:border-slate-800">
+                    <td className="py-3"><div className="skeleton h-4 w-32" /></td>
+                    <td className="py-3"><div className="skeleton h-4 w-24" /></td>
+                    <td className="py-3"><div className="skeleton h-4 w-28" /></td>
+                    <td className="py-3"><div className="skeleton h-6 w-16 rounded-full" /></td>
+                    <td className="py-3"><div className="skeleton h-4 w-10" /></td>
+                    <td className="py-3"><div className="skeleton h-4 w-10" /></td>
+                    <td className="py-3"><div className="skeleton h-4 w-20" /></td>
+                  </tr>
+                ))
+              : filtered.map((device) => (
+                  <tr key={device.id} className="border-b border-slate-200/80 text-slate-700 dark:border-slate-800 dark:text-slate-100">
+                    <td className="py-3 font-medium">{device.name}</td>
+                    <td className="py-3">{device.ip}</td>
+                    <td className="py-3">{device.os}</td>
+                    <td className="py-3">
+                      <span
+                        className={
+                          device.status === 'online'
+                            ? 'rounded-full bg-emerald-500/15 px-2 py-1 text-emerald-500'
+                            : device.status === 'warning'
+                              ? 'rounded-full bg-amber-500/15 px-2 py-1 text-amber-500'
+                              : 'rounded-full bg-rose-500/15 px-2 py-1 text-rose-500'
+                        }
+                      >
+                        {device.status}
+                      </span>
+                    </td>
+                    <td className="py-3">{device.riskScore}</td>
+                    <td className="py-3">{device.openCVEs}</td>
+                    <td className="py-3">{device.lastSeen}</td>
+                  </tr>
+                ))}
           </tbody>
         </table>
       </div>
